@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+		http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+
+	<parent>
+		<groupId>org.scijava</groupId>
+		<artifactId>pom-scijava</artifactId>
+		<relativePath />
+	</parent>
+
+	<groupId>com.wurgobes</groupId>
+	<artifactId>sSMLMA</artifactId>
+	<version>0.1-SNAPSHOT</version>
+
+
+	<name>sSMLM Analyzer</name>
+	<description>A spectral super resolution miscoscopy analyzer</description>
+	<url>https://github.com/HohlbeinLab/sSMLMAnalyzer</url>
+	<inceptionYear>2020</inceptionYear>
+	<organization>
+		<name>Wageningen University</name>
+		<url>https://wur.nl/</url>
+	</organization>
+	<licenses>
+		<license>
+			<name>GPL-3.0 License</name>
+			<distribution>repo</distribution>
+		</license>
+	</licenses>
+
+	<contributors>
+		<contributor>
+			<name>Martijn Gobes</name>
+			<email>martijn.gobes@wur.nl</email>
+			<organization>WUR</organization>
+			<organizationUrl>https://www.wur.nl/</organizationUrl>
+			<roles>
+				<role>developer</role>
+			</roles>
+		</contributor>
+	</contributors>
+
+	<developers>
+		<developer>
+			<id>mgobes</id>
+			<name>Martijn Gobes</name>
+			<roles>
+				<role>founder</role>
+				<role>lead</role>
+				<role>developer</role>
+				<role>debugger</role>
+				<role>reviewer</role>
+				<role>support</role>
+				<role>maintainer</role>
+			</roles>
+		</developer>
+	</developers>
+
+
+	<mailingLists>
+		<mailingList>
+			<name>Image.sc Forum</name>
+			<archive>https://forum.image.sc/tags/imagej</archive>
+		</mailingList>
+	</mailingLists>
+
+	<scm>
+		<connection>scm:git:git://github.com/HohlbeinLab/sSMLMAnalyzer</connection>
+		<developerConnection>scm:git:git@github.com:DrNjitram</developerConnection>
+		<tag>HEAD</tag>
+		<url>https://github.com/HohlbeinLab/sSMLMAnalyzer</url>
+	</scm>
+	<issueManagement>
+		<system>GitHub Issues</system>
+		<url>https://github.com/HohlbeinLab/sSMLMAnalyzer/issues</url>
+	</issueManagement>
+	<ciManagement>
+		<system>None</system>
+	</ciManagement>
+
+	<properties>
+		<package-name>com.wurgobes.sSMLMAnalyzer</package-name>
+		<main-class>com.wurgobes.sSMLMAnalyzer.sSMLMA</main-class>
+		<license.licenseName>bsd_2</license.licenseName>
+		<license.copyrightOwners>WUR, Inc.</license.copyrightOwners>
+		<scijava.app.directory>C:\Users\Martijn\Desktop\Thesis2020\ImageJ\fiji-win64\Fiji.app</scijava.app.directory>
+	</properties>
+
+	<repositories>
+		<repository>
+			<id>scijava.public</id>
+			<url>https://maven.scijava.org/content/groups/public</url>
+		</repository>
+	</repositories>
+
+	<dependencies>
+		<dependency>
+			<groupId>net.imagej</groupId>
+			<artifactId>ij</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>net.imglib2</groupId>
+			<artifactId>imglib2-ij</artifactId>
+		</dependency>
+	</dependencies>
+	
+</project>
