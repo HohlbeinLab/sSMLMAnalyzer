@@ -1,8 +1,14 @@
 package com.wurgobes.sSMLMAnalyzer;
 
 
+
 import ij.*;
+
+import ij.gui.Plot;
 import ij.plugin.PlugIn;
+import ij.gui.HistogramWindow;
+
+import ij.process.FloatProcessor;
 import org.jblas.exceptions.LapackException;
 import org.scijava.plugin.Parameter;
 
@@ -13,11 +19,12 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Scanner;
+
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+
+
+import fiji.util.gui.GenericDialogPlus;
 
 import org.jblas.FloatMatrix;
 
@@ -37,10 +44,10 @@ public class sSMLMA implements PlugIn {
     private final String[] unit_prefixes = {"null", "photons", "m", "cm", "mm", "um", "nm", "ang", "pm", "fm"};
 
     @Parameter
-    private final String filePath = "F:\\ThesisData\\output\\output1_merged_filter2.csv";
+    private String filePath = "F:\\ThesisData\\output\\output3_drift.csv";
 
     @Parameter
-    private static final String CSV_FILE_NAME = "C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\own_output.csv";
+    private String CSV_FILE_NAME = "C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\small.csv";
 
     @Parameter
     private final boolean saveSCV = true;
@@ -49,11 +56,31 @@ public class sSMLMA implements PlugIn {
     private final float[] angRange = {(float) (-0.04 * Math.PI), (float)(0.04 * Math.PI)};
 
     @Parameter
-    private final float[] distRange = {1700, 2500}; //default was {2500, 4500}
+    private final float[] distRange = {1500, 2500}; //default was {2500, 4500}
 
+
+
+
+    public void setup(){
+        GenericDialogPlus gd = new GenericDialogPlus("settings");
+
+        gd.addFileField("CSV input", filePath, 50);
+        gd.addFileField("CSV output", CSV_FILE_NAME, 50);
+
+        gd.showDialog();
+
+        filePath = gd.getNextString();
+        CSV_FILE_NAME = gd.getNextString();
+
+
+
+    }
 
     @Override
     public void run(String arg) {
+
+        //setup();
+
         double csvTime = System.nanoTime();
 
         FloatMatrix floatMatrix = null;
@@ -114,7 +141,7 @@ public class sSMLMA implements PlugIn {
             FloatMatrix subtractedY = makeSubstractedMatrix(frameData.getColumn(2));
 
             FloatMatrix distances = Distance(subtractedX, subtractedY);
-            FloatMatrix angles = atan2(subtractedX, subtractedY);
+            FloatMatrix angles = atan2(subtractedX, subtractedY, distances);
 
 
             int[] correctAngleAndDistance = distances.gt(distRange[0]).and(distances.lt(distRange[1]))
@@ -200,16 +227,26 @@ public class sSMLMA implements PlugIn {
                 "distance [" + (unit_prefixes[unitsIndices[revOptionsIndices[2]]].equals(unit_prefixes[unitsIndices[revOptionsIndices[3]]]) ? unit_prefixes[unitsIndices[revOptionsIndices[2]]]:("(" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "*" +unit_prefixes[unitsIndices[revOptionsIndices[2]]] + ")^½"))+ "]",
                 "angle"
         };
-        System.out.println(Arrays.toString(Header));
+        //System.out.println(Arrays.toString(Header));
         for(int i = 0; i < finalPossibilities.rows; i++){
             finalPossibilities.put(i, 0, id++);
-            System.out.println(finalPossibilities.getRow(i));
+            //System.out.println(finalPossibilities.getRow(i));
         }
 
         processingTime = System.nanoTime() - processingTime;
         System.out.println("\nProcessing data took " + String.format("%.3f", processingTime/1000000000) + " s");
 
+        FloatProcessor histData = new FloatProcessor(new float[][]{finalPossibilities.getColumn(8).toArray()});
+        ImagePlus dummy = new ImagePlus("WHY", histData);
+        HistogramWindow hist = new HistogramWindow("Histogram", dummy,(int) ((finalPossibilities.getColumn(8).max()-finalPossibilities.getColumn(8).min())/10), distRange[0], distRange[1]);
 
+        Plot plot = new Plot("Points", "x", "y");
+        plot.setColor("green");
+        plot.add("circle",toDouble(finalPossibilities.getColumn(3)), toDouble(finalPossibilities.getColumn(4)));
+        plot.setColor("red");
+        plot.add("cross",toDouble(finalPossibilities.getColumn(6)), toDouble(finalPossibilities.getColumn(7)));
+
+        plot.show();
 
         if(saveSCV) SaveCSV(finalPossibilities, Header);
 
@@ -232,7 +269,7 @@ public class sSMLMA implements PlugIn {
     public static void main(String[] args) {
         new ImageJ();
         IJ.runPlugIn(sSMLMA.class.getName(), "");
-        System.exit(0);
+
     }
 }
 

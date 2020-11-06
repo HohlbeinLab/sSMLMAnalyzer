@@ -1,9 +1,7 @@
 package com.wurgobes.sSMLMAnalyzer;
 
 import org.jblas.FloatMatrix;
-import org.jblas.*;
 
-import java.util.Arrays;
 
 import static org.jblas.MatrixFunctions.sqrt;
 import static org.jblas.MatrixFunctions.atan;
@@ -12,13 +10,16 @@ import static org.jblas.MatrixFunctions.atan;
 
 public class Util {
 
+
     public static FloatMatrix atan2(FloatMatrix x, FloatMatrix y){
+        return atan2(x, y, Distance(x, y));
+    }
+
+    public static FloatMatrix atan2(FloatMatrix x, FloatMatrix y, FloatMatrix intermediate){
         //Very much not a perfect solution
         //https://en.wikipedia.org/wiki/Atan2
         x.assertSameSize(y);
         FloatMatrix result = new FloatMatrix(x.rows, x.columns);
-
-        FloatMatrix intermediate = Distance(x, y);
 
         FloatMatrix domainOne = atan(y.div(intermediate.add(x))).mul(2);
         FloatMatrix domainTwo = atan(intermediate.sub(x).div(y)).mul(2);
@@ -27,7 +28,6 @@ public class Util {
         for(int index : x.le(0).and(y.ne(0)).findIndices()) result.put(index, domainTwo.get(index));
         for(int index : x.lt(0).and(y.eq(0)).findIndices()) result.put(index, (float) Math.PI);
         for(int index : x.eq(0).and(y.eq(0)).findIndices()) result.put(index, Float.NaN);
-
 
         return result;
     }
@@ -49,5 +49,11 @@ public class Util {
         return subtracted;
     }
 
+    public static double[] toDouble(FloatMatrix A){
+        double[] result = new double[A.length];
 
+        for(int i = 0; i < A.length; i++) result[i] = (double) A.get(i);
+
+        return result;
+    }
 }
