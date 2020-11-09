@@ -3,6 +3,11 @@ package com.wurgobes.sSMLMAnalyzer;
 import org.jblas.FloatMatrix;
 
 
+import java.io.File;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.List;
+
 import static org.jblas.MatrixFunctions.sqrt;
 import static org.jblas.MatrixFunctions.atan;
 
@@ -27,7 +32,8 @@ public class Util {
         for(int index : x.gt(0).findIndices()) result.put(index, domainOne.get(index));
         for(int index : x.le(0).and(y.ne(0)).findIndices()) result.put(index, domainTwo.get(index));
         for(int index : x.lt(0).and(y.eq(0)).findIndices()) result.put(index, (float) Math.PI);
-        for(int index : x.eq(0).and(y.eq(0)).findIndices()) result.put(index, Float.NaN);
+        for(int i = 0; i < result.rows; i++) result.put(i, i, Float.NaN);
+
 
         return result;
     }
@@ -44,7 +50,7 @@ public class Util {
 
         for(int point = 0; point < dataPoints; point++){
             float a = A.get(point);
-            subtracted.putRow(point, A.sub(a));
+            subtracted.putRow(point, A.rsub(a));
         }
         return subtracted;
     }
@@ -55,5 +61,33 @@ public class Util {
         for(int i = 0; i < A.length; i++) result[i] = (double) A.get(i);
 
         return result;
+    }
+
+    public static FloatMatrix extend(FloatMatrix A, int rows, int collumns){
+        FloatMatrix result = new FloatMatrix(rows, collumns);
+        for(int i = 0; i < A.rows; i++){
+            for(int j = 0; j < A.columns; j++){
+                result.put(i, j, A.get(i, j));
+            }
+        }
+        return result;
+    }
+
+    public static void SaveCSV(FloatMatrix data, List<String> Headers, String CSV_FILE_NAME)  {
+        File csvOutputFile = new File(CSV_FILE_NAME);
+        try (PrintWriter pw = new PrintWriter(csvOutputFile)) {
+            pw.println(String.join(",", Headers));
+            pw.println(data.toString("%f", "", "",", ", "\n"));
+        } catch(IOException error) {
+            System.out.println("Could not save CSV.");
+            error.printStackTrace();
+        }
+    }
+
+    public static void mirror(FloatMatrix A, int col){
+        FloatMatrix temp = A.getColumn(col);
+        float mean = temp.mean();
+        temp.muli(-1.0f).addi(mean * 2);
+        A.putColumn(col, temp);
     }
 }

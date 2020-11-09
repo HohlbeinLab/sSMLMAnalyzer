@@ -7,19 +7,15 @@ import ij.*;
 import ij.gui.Plot;
 import ij.plugin.PlugIn;
 import ij.gui.HistogramWindow;
-
 import ij.process.FloatProcessor;
-import org.jblas.exceptions.LapackException;
+
+
 import org.scijava.plugin.Parameter;
 
-
-import java.io.File;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -27,15 +23,13 @@ import java.util.regex.Pattern;
 import fiji.util.gui.GenericDialogPlus;
 
 import org.jblas.FloatMatrix;
+import org.jblas.exceptions.LapackException;
 
 import static com.wurgobes.sSMLMAnalyzer.Util.*;
 import static com.wurgobes.sSMLMAnalyzer.levenshtein.getTheClosestMatch;
 
 
-
 public class sSMLMA implements PlugIn {
-
-    private static final String COMMA_DELIMITER = ",";
 
 
     private final int[] unit_decades = {0, 0, 0, -2, -3, -6, -9, -10, -12, -15};
@@ -58,8 +52,8 @@ public class sSMLMA implements PlugIn {
     @Parameter
     private final float[] distRange = {1500, 2500}; //default was {2500, 4500}
 
-
-
+    @Parameter
+    private final int orders = 4; //This its the number of orders, including the 0th, so 3 would be 0th + 1st + 2nd
 
     public void setup(){
         GenericDialogPlus gd = new GenericDialogPlus("settings");
@@ -71,9 +65,6 @@ public class sSMLMA implements PlugIn {
 
         filePath = gd.getNextString();
         CSV_FILE_NAME = gd.getNextString();
-
-
-
     }
 
     @Override
@@ -82,6 +73,12 @@ public class sSMLMA implements PlugIn {
         //setup();
 
         double csvTime = System.nanoTime();
+
+        //Primitive64Matrix.Factory matrixFactory = Primitive64Matrix.FACTORY;
+
+        //LineSplittingParser lineSplittingParser = new LineSplittingParser();
+
+        //lineSplittingParser.parse(filePath, false, );
 
         FloatMatrix floatMatrix = null;
         List<String> collumns = new ArrayList<>();
@@ -118,9 +115,10 @@ public class sSMLMA implements PlugIn {
                 unitsIndices[i] = getTheClosestMatch(unit_prefixes, matcher.group(3));
             }
         }
-
+        //frame, x, y
         final FloatMatrix data = floatMatrix.getColumns(new int[]{revOptionsIndices[1], revOptionsIndices[2], revOptionsIndices[3]});
 
+        
         final int frames = (int) data.getColumn(0).max(); //1 indexed
 
         csvTime = System.nanoTime() - csvTime;
@@ -129,9 +127,17 @@ public class sSMLMA implements PlugIn {
 
         int id = 0;
 
-        FloatMatrix finalPossibilities = new FloatMatrix(0, 10);
+        // Currently doesnt give good results when a situations might arise where:
+        // 1 - 2
+        // 1 - 3
+        // 3 - 4
+        // This would stop the chain after 1-2, instead of finding 1-3-4
+
+        int totalCollumns = 2 + (orders * 5);
+        FloatMatrix finalPossibilities = new FloatMatrix(0, totalCollumns);
         for(int frame = 1; frame <= frames; frame++){
             IJ.showProgress(frame, frames);
+            IJ.showStatus(frame + "/" + frames);
 
             int[] frameIndicices = data.getColumn(0).eq(frame).findIndices();
 
@@ -150,11 +156,12 @@ public class sSMLMA implements PlugIn {
 
             if(correctAngleAndDistance.length > 1){
 
-                FloatMatrix possibilities = new FloatMatrix(correctAngleAndDistance.length, 10);
+                FloatMatrix possibilities = new FloatMatrix(correctAngleAndDistance.length, totalCollumns);
+                FloatMatrix intermediateFinalPossibilities = new FloatMatrix(0, totalCollumns);
 
                 for(int i = 0; i < correctAngleAndDistance.length; i++) {
                     int index = correctAngleAndDistance[i];
-                    possibilities.putRow(i, new FloatMatrix(1, 10,
+                    possibilities.putRow(i, extend(new FloatMatrix(1, 10,
                             id++,                                                           //0
                             frame,                                                          //1
                             Math.floorDiv(index, distances.rows),                           //2
@@ -165,7 +172,7 @@ public class sSMLMA implements PlugIn {
                             frameData.get(index % distances.rows, 2),    //7
                             distances.get(index),                                           //8
                             angles.get(index)                                               //9
-                    ));
+                    ),1, totalCollumns));
                 }
                 FloatMatrix connectedIds = possibilities.getColumn(5);
                 List<Integer> toSkip = new ArrayList<>();
@@ -190,17 +197,50 @@ public class sSMLMA implements PlugIn {
                             temp_arr.put(3, cumX/identicalIdSum);
                             temp_arr.put(4, cumY/identicalIdSum);
 
-                            finalPossibilities = FloatMatrix.concatVertically(finalPossibilities, temp_arr);
+                            intermediateFinalPossibilities = FloatMatrix.concatVertically(intermediateFinalPossibilities, temp_arr);
 
                         } else {
-                            finalPossibilities = FloatMatrix.concatVertically(finalPossibilities, possibilities.getRow(i));
+                            intermediateFinalPossibilities = FloatMatrix.concatVertically(intermediateFinalPossibilities, possibilities.getRow(i));
+                        }
+                    }
+                }
+                List<Integer> toKeep = new ArrayList<>();
+                for(int row = 0; row < intermediateFinalPossibilities.rows; row ++){
+                    float index = intermediateFinalPossibilities.get(row, 2);
+                    int curr_row = row;
+                    if(intermediateFinalPossibilities.getColumn(5).eq(index).sum() == 0.0f) { //Start of chain
+                        toKeep.add(row);
+                        for(int order = 2; order < orders; order++){
+
+                            int connected_to = (int) intermediateFinalPossibilities.get(curr_row, 5);
+                            int[] connected_indices = intermediateFinalPossibilities.getColumn(2).eq(connected_to).findIndices();
+                            if(connected_indices.length > 0) {
+                                //Do only one for now
+                                curr_row = connected_indices[0];
+
+                                //i.e. 10: id, 11: x, 12: y, 13: distance, 14: angle
+                                int[] target_range = new int[]{2 + (order * 4), 3 + (order * 4), 4 + (order * 4), 5 + (order * 4), 6 + (order * 4)};
+                                FloatMatrix target_row = intermediateFinalPossibilities.getRow(curr_row);
+                                intermediateFinalPossibilities.put(row, target_range, target_row.getColumns(new int[]{5, 6, 7, 8, 9}));
+
+                            } else {
+                                break;
+                            }
+                        }
+                        int connected_to = (int) intermediateFinalPossibilities.get(curr_row, 5);
+                        int[] connected_indices = intermediateFinalPossibilities.getColumn(2).eq(connected_to).findIndices();
+                        if(connected_indices.length > 0) {
+                            System.out.println("There seem to be more orders than " + orders);
                         }
                     }
                 }
 
+                int[] indices = toKeep.stream().mapToInt(i->i).toArray();
+                finalPossibilities = FloatMatrix.concatVertically(finalPossibilities, intermediateFinalPossibilities.getRows(indices));
+
             } else if(correctAngleAndDistance.length > 0){
                 int index = correctAngleAndDistance[0];
-                finalPossibilities = FloatMatrix.concatVertically(finalPossibilities, new FloatMatrix(1, 10,
+                finalPossibilities = FloatMatrix.concatVertically(finalPossibilities, extend(new FloatMatrix(1, 10,
                         id++,
                         frame,
                         Math.floorDiv(index, distances.rows),
@@ -210,23 +250,26 @@ public class sSMLMA implements PlugIn {
                         frameData.get( index%distances.rows, 1),
                         frameData.get( index%distances.rows, 2),
                         distances.get(index),
-                        angles.get(index)));
+                        angles.get(index)
+                ), 1, totalCollumns));
             }
         }
 
         //Fix ids
         id = 0;
-        String[] Header = {
-                "id","frame",
-                "start index",
-                "start x [" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "]",
-                "start y [" + unit_prefixes[unitsIndices[revOptionsIndices[3]]] + "]",
-                "end index",
-                "end x [" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "]",
-                "end y [" + unit_prefixes[unitsIndices[revOptionsIndices[3]]] + "]",
-                "distance [" + (unit_prefixes[unitsIndices[revOptionsIndices[2]]].equals(unit_prefixes[unitsIndices[revOptionsIndices[3]]]) ? unit_prefixes[unitsIndices[revOptionsIndices[2]]]:("(" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "*" +unit_prefixes[unitsIndices[revOptionsIndices[2]]] + ")^½"))+ "]",
-                "angle"
-        };
+        List<String> Headers = new ArrayList<>();
+        Headers.add("id");
+        Headers.add("frame");
+        String distanceUnit =  (unit_prefixes[unitsIndices[revOptionsIndices[2]]].equals(unit_prefixes[unitsIndices[revOptionsIndices[3]]]) ? unit_prefixes[unitsIndices[revOptionsIndices[2]]]:("(" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "*" +unit_prefixes[unitsIndices[revOptionsIndices[2]]] + ")^½"));
+        for(int i = 0; i < orders; i++){
+            Headers.add(i + " index");
+            Headers.add(i + " x [" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "]");
+            Headers.add(i + " y [" + unit_prefixes[unitsIndices[revOptionsIndices[3]]] + "]");
+            if(i>0){
+                Headers.add((i-1) + "-" + i + " distance" + distanceUnit);
+                Headers.add((i-1) + "-" + i + "angle");
+            }
+        }
         //System.out.println(Arrays.toString(Header));
         for(int i = 0; i < finalPossibilities.rows; i++){
             finalPossibilities.put(i, 0, id++);
@@ -238,31 +281,38 @@ public class sSMLMA implements PlugIn {
 
         FloatProcessor histData = new FloatProcessor(new float[][]{finalPossibilities.getColumn(8).toArray()});
         ImagePlus dummy = new ImagePlus("WHY", histData);
-        HistogramWindow hist = new HistogramWindow("Histogram", dummy,(int) ((finalPossibilities.getColumn(8).max()-finalPossibilities.getColumn(8).min())/10), distRange[0], distRange[1]);
+        HistogramWindow hist = new HistogramWindow("0th-1st", dummy,(int) ((finalPossibilities.getColumn(8).max()-finalPossibilities.getColumn(8).min())/10), distRange[0], distRange[1]);
+
+
+        FloatMatrix nonZero = finalPossibilities.getColumn(13).get(finalPossibilities.getColumn(13).ne(0.0f).findIndices());
+        FloatProcessor histData2 = new FloatProcessor(nonZero.toArray2());
+        ImagePlus dummy2 = new ImagePlus("WHY", histData2);
+        HistogramWindow hist2 = new HistogramWindow("1st-2nd", dummy2,(int) ((nonZero.max()-nonZero.min())/10), distRange[0], distRange[1]);
+
 
         Plot plot = new Plot("Points", "x", "y");
-        plot.setColor("green");
-        plot.add("circle",toDouble(finalPossibilities.getColumn(3)), toDouble(finalPossibilities.getColumn(4)));
-        plot.setColor("red");
-        plot.add("cross",toDouble(finalPossibilities.getColumn(6)), toDouble(finalPossibilities.getColumn(7)));
 
+        String[] colors = {"blue", "red", "green", "black"};
+        String[] shapes = {"circle", "cross", "box", "diamond"};//  "line", "connected circle", "filled", "bar", "separated bar", "circle", "box", "triangle", "diamond", "cross", "x", "dot", "error bars" or "xerror bars"
+
+
+        plot.setColor(colors[0]); //0th
+        plot.add(shapes[0],toDouble(finalPossibilities.getColumn(3)), toDouble(finalPossibilities.getColumn(4)));
+        for(int i = 1; i < orders ; i++){
+            plot.setColor(colors[i]);
+            plot.add(shapes[i],toDouble(finalPossibilities.getColumn(1 + (i * 5))), toDouble(finalPossibilities.getColumn(2 + (i * 5))));
+        } //6, 7//11, 12
+
+
+        plot.setLegend("0th\t1st\t2nd\t3rd", Plot.AUTO_POSITION);
         plot.show();
 
-        if(saveSCV) SaveCSV(finalPossibilities, Header);
+        if(saveSCV) SaveCSV(finalPossibilities, Headers, CSV_FILE_NAME);
+
 
     }
 
-    public void SaveCSV(FloatMatrix data, String[] Headers)  {
-        File csvOutputFile = new File(CSV_FILE_NAME);
-        try (PrintWriter pw = new PrintWriter(csvOutputFile)) {
-                pw.println(String.join(",", Headers));
-                pw.println(data.toString("%f", "", "",", ", "\n"));
-        } catch(IOException error) {
-            System.out.println("Could not save CSV.");
-            error.printStackTrace();
-        }
 
-    }
 
 
 
