@@ -5,9 +5,12 @@ package com.wurgobes.sSMLMAnalyzer;
 import ij.*;
 
 import ij.gui.Plot;
+import ij.measure.CurveFitter;
 import ij.plugin.PlugIn;
 import ij.gui.HistogramWindow;
+import ij.plugin.filter.MaximumFinder;
 import ij.process.FloatProcessor;
+import static ij.plugin.filter.MaximumFinder.findMaxima;
 
 
 import org.scijava.plugin.Parameter;
@@ -15,6 +18,7 @@ import org.scijava.plugin.Parameter;
 import java.io.IOException;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -24,6 +28,8 @@ import fiji.util.gui.GenericDialogPlus;
 
 import org.jblas.FloatMatrix;
 import org.jblas.exceptions.LapackException;
+
+
 
 import static com.wurgobes.sSMLMAnalyzer.Util.*;
 import static com.wurgobes.sSMLMAnalyzer.levenshtein.getTheClosestMatch;
@@ -53,7 +59,10 @@ public class sSMLMA implements PlugIn {
     private final float[] distRange = {1500, 2500}; //default was {2500, 4500}
 
     @Parameter
-    private final int orders = 4; //This its the number of orders, including the 0th, so 3 would be 0th + 1st + 2nd
+    private int orders = 4; //This its the number of orders, including the 0th, so 3 would be 0th + 1st + 2nd
+
+    @Parameter
+    private final boolean toCleanup = true;
 
     public void setup(){
         GenericDialogPlus gd = new GenericDialogPlus("settings");
@@ -118,7 +127,7 @@ public class sSMLMA implements PlugIn {
         //frame, x, y
         final FloatMatrix data = floatMatrix.getColumns(new int[]{revOptionsIndices[1], revOptionsIndices[2], revOptionsIndices[3]});
 
-        
+
         final int frames = (int) data.getColumn(0).max(); //1 indexed
 
         csvTime = System.nanoTime() - csvTime;
@@ -214,14 +223,18 @@ public class sSMLMA implements PlugIn {
 
                             int connected_to = (int) intermediateFinalPossibilities.get(curr_row, 5);
                             int[] connected_indices = intermediateFinalPossibilities.getColumn(2).eq(connected_to).findIndices();
-                            if(connected_indices.length > 0) {
-                                //Do only one for now
-                                curr_row = connected_indices[0];
 
-                                //i.e. 10: id, 11: x, 12: y, 13: distance, 14: angle
-                                int[] target_range = new int[]{2 + (order * 4), 3 + (order * 4), 4 + (order * 4), 5 + (order * 4), 6 + (order * 4)};
-                                FloatMatrix target_row = intermediateFinalPossibilities.getRow(curr_row);
-                                intermediateFinalPossibilities.put(row, target_range, target_row.getColumns(new int[]{5, 6, 7, 8, 9}));
+                            if(connected_indices.length > 0) {
+
+                                for(int i = 0; i < connected_indices.length; i++) {
+                                    //Do only one for now
+                                    curr_row = connected_indices[i];
+
+                                    //i.e. 10: id, 11: x, 12: y, 13: distance, 14: angle
+                                    int[] target_range = new int[]{order * 5, 1 + (order * 5), 2 + (order * 5), 3 + (order * 5), 4 + (order * 5)};
+                                    FloatMatrix target_row = intermediateFinalPossibilities.getRow(curr_row);
+                                    intermediateFinalPossibilities.put(row, target_range, target_row.getColumns(new int[]{5, 6, 7, 8, 9}));
+                                }
 
                             } else {
                                 break;
@@ -276,18 +289,29 @@ public class sSMLMA implements PlugIn {
             //System.out.println(finalPossibilities.getRow(i));
         }
 
+        if(toCleanup) {
+            IJ.showStatus("Cleaning Data");
+            finalPossibilities = cleanup(finalPossibilities, 7, 100);
+        }
+
         processingTime = System.nanoTime() - processingTime;
         System.out.println("\nProcessing data took " + String.format("%.3f", processingTime/1000000000) + " s");
 
-        FloatProcessor histData = new FloatProcessor(new float[][]{finalPossibilities.getColumn(8).toArray()});
-        ImagePlus dummy = new ImagePlus("WHY", histData);
-        HistogramWindow hist = new HistogramWindow("0th-1st", dummy,(int) ((finalPossibilities.getColumn(8).max()-finalPossibilities.getColumn(8).min())/10), distRange[0], distRange[1]);
 
+        HistogramWindow[] histograms = new HistogramWindow[orders-1];
+        for(int i = 0; i < orders - 1; i++){
+            FloatMatrix relevantData;
+            if(i==0){
+                relevantData = finalPossibilities.getColumn(8);
+            } else {
+                relevantData = finalPossibilities.getColumn(8 + (i * 5));
+                relevantData = relevantData.get(relevantData.ne(0.0f).findIndices());
+            }
+            if(relevantData.rows < 10) {orders = i + 1; break;} //No relevant amount of data above this point
+            ImagePlus dummy = new ImagePlus("", new FloatProcessor(relevantData.toArray2()));
+            histograms[i] = new HistogramWindow(getTitleHist(i), dummy, getBins(relevantData, 5), distRange[0], distRange[1]);
+        }
 
-        FloatMatrix nonZero = finalPossibilities.getColumn(13).get(finalPossibilities.getColumn(13).ne(0.0f).findIndices());
-        FloatProcessor histData2 = new FloatProcessor(nonZero.toArray2());
-        ImagePlus dummy2 = new ImagePlus("WHY", histData2);
-        HistogramWindow hist2 = new HistogramWindow("1st-2nd", dummy2,(int) ((nonZero.max()-nonZero.min())/10), distRange[0], distRange[1]);
 
 
         Plot plot = new Plot("Points", "x", "y");
@@ -301,11 +325,41 @@ public class sSMLMA implements PlugIn {
         for(int i = 1; i < orders ; i++){
             plot.setColor(colors[i]);
             plot.add(shapes[i],toDouble(finalPossibilities.getColumn(1 + (i * 5))), toDouble(finalPossibilities.getColumn(2 + (i * 5))));
-        } //6, 7//11, 12
+        }
 
 
-        plot.setLegend("0th\t1st\t2nd\t3rd", Plot.AUTO_POSITION);
+        plot.setLegend(getTitlePlot(orders), Plot.AUTO_POSITION);
         plot.show();
+
+        for(int i = 0; i < orders - 1; i++){
+            HistogramWindow hist = histograms[i];
+            for(int maximum : getMaxima(hist.getHistogram(), 5)) System.out.println(i + ": " + hist.getXValues()[maximum]);
+        }
+
+
+
+        //debug breakpoints
+        // 1833 for 0-1 8
+        // 1833 for 1-2 13
+
+        /*
+        int[] firstIndices = finalPossibilities.getColumn(8).lt(1833).findIndices();
+        int[] secondIndices = finalPossibilities.getColumn(8).ge(1833).findIndices();
+
+        FloatMatrix first = finalPossibilities.getRows(firstIndices).getColumn(13);
+        FloatMatrix second = finalPossibilities.getRows(secondIndices).getColumn(13);
+        float[][] firstValues = first.toArray2();
+        float[][] secondValues = second.toArray2();
+
+        new HistogramWindow("dummy 1", new ImagePlus("", new FloatProcessor(firstValues)), (int) ((first.max()-first.min())/20), distRange[0], distRange[1]);
+        new HistogramWindow("dummy 2", new ImagePlus("", new FloatProcessor(secondValues)), (int) ((second.max()-second.min())/20), distRange[0], distRange[1]);
+         */
+
+        //CurveFitter curveFitter = new CurveFitter(hist.getXValues(), toDouble(hist.getHistogram()));
+        //curveFitter.doFit(CurveFitter.GAUSSIAN);
+
+        //System.out.println(curveFitter.getStatusString());
+        //System.out.println(Arrays.toString(curveFitter.getParams()));
 
         if(saveSCV) SaveCSV(finalPossibilities, Headers, CSV_FILE_NAME);
 
