@@ -101,7 +101,7 @@
 	<dependencies>
 		<dependency>
 			<groupId>net.imagej</groupId>
-			<artifactId>ij</artifactId>
+			<artifactId>imagej</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>net.imglib2</groupId>
@@ -110,25 +110,25 @@
 		<dependency>
 			<groupId>org.jblas</groupId>
 			<artifactId>jblas</artifactId>
-			<version>1.2.4</version>
+			<version>1.2.5</version>
 		</dependency>
         <dependency>
             <groupId>sc.fiji</groupId>
             <artifactId>fiji-lib</artifactId>
             <version>2.1.2</version>
         </dependency>
-		<!--Might be needed
-		<dependency>
-			<groupId>org.ujmp</groupId>
-			<artifactId>ujmp-core</artifactId>
-			<version>0.3.0</version>
-		</dependency>
-		<dependency>
-			<groupId>org.ojalgo</groupId>
-			<artifactId>ojalgo</artifactId>
-			<version>48.3.1</version>
-		</dependency>
-		-->
+        <!--Might be needed
+        <dependency>
+            <groupId>org.ujmp</groupId>
+            <artifactId>ujmp-core</artifactId>
+            <version>0.3.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.ojalgo</groupId>
+            <artifactId>ojalgo</artifactId>
+            <version>48.3.1</version>
+        </dependency>
+        -->
 	</dependencies>
 	
 </project>
