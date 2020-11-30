@@ -115,8 +115,11 @@
         <dependency>
             <groupId>sc.fiji</groupId>
             <artifactId>fiji-lib</artifactId>
-            <version>2.1.2</version>
         </dependency>
+		<dependency>
+			<groupId>sc.fiji</groupId>
+			<artifactId>Directionality_</artifactId>
+		</dependency>
         <!--Might be needed
         <dependency>
             <groupId>org.ujmp</groupId>

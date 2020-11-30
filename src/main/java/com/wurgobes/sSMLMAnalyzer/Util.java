@@ -2,28 +2,25 @@ package com.wurgobes.sSMLMAnalyzer;
 
 import ij.IJ;
 import ij.ImagePlus;
-import ij.process.ByteProcessor;
+import ij.gui.Plot;
 import ij.process.FloatProcessor;
-import ij.process.ShortProcessor;
-import net.imglib2.RealInterval;
+
 import net.imglib2.RealPoint;
 import net.imglib2.RealPointSampleList;
-import net.imglib2.type.numeric.integer.UnsignedShortType;
+import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.real.FloatType;
+import net.imglib2.util.RealSum;
+
 import org.jblas.FloatMatrix;
 
-
-import javax.xml.stream.FactoryConfigurationError;
-import java.awt.*;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
-import java.util.Random;
 
-import static ij.plugin.filter.MaximumFinder.findMaxima;
+import java.util.List;
+
 import static org.jblas.MatrixFunctions.*;
 
 
@@ -109,7 +106,6 @@ public class Util {
         }
     }
 
-
     public static int getBins(FloatMatrix A, float width){
         return (int) ((A.max()-A.min())/width);
     }
@@ -147,6 +143,7 @@ public class Util {
 
         for(int i = 0; i < A.rows; i++){
             IJ.showProgress(i, A.rows);
+            if(i % 1000 == 0) System.out.println(i);
             float x = A.get(i, 3);
             float y = A.get(i, 4);
 
@@ -165,7 +162,7 @@ public class Util {
         for(int row = 0; row < intermediate.rows; row ++){
             float index = intermediate.get(row, 2);
 
-            if(intermediate.getColumn(5).eq(index).sum() == 0.0f) { //Start of chain
+            if(intermediate.getColumn(6).eq(index).sum() == 0.0f) { //Start of chain
                 toKeep.add(row);
 
                 int connected_to = (int) intermediate.get(row, 6);
@@ -284,7 +281,7 @@ public class Util {
         return result;
     }
 
-    public static FloatProcessor getImageFromPoints(FloatMatrix A, int[] reduction, int width, int height){
+    public static ImagePlus getImageFromPoints(FloatMatrix A, float[] reduction, int width, int height){
         float[] data = new float[width * height];
         float max_intensity = A.getColumn(2).max();
         FloatMatrix intensities = A.getColumn(2).div(max_intensity);
@@ -292,6 +289,103 @@ public class Util {
             data[(int)(A.get(i, 0)/reduction[0]) + (int)(A.get(i, 1)/reduction[1]) * height] = intensities.get(i);
         }
 
-        return new FloatProcessor(width, height, data, null);
+        return new ImagePlus("Points", new FloatProcessor(width, height, data, null));
+    }
+
+    public static < T extends RealType< T > > double getSum( final Iterable< T > iterable ) {
+        final RealSum sum = new RealSum();
+
+        for ( final T type : iterable )
+            sum.add( type.getRealDouble() );
+
+        return sum.getSum();
+    }
+
+    public static void addLutLegend(Plot plot, OwnColorTable ct, String label, double x, double y, int width, double start, double end){
+        for(int i = 0; i < width; i++){
+            plot.setColor(ct.getColor(i, 0, width));
+            plot.drawNormalizedLine(0.01 + 0.0005 * (i+2),0.93, 0.01 + 0.0005 * (i+2), 0.99);
+        }
+        plot.setColor("black");
+        plot.drawNormalizedLine(0.01,0.925, 0.01, 0.995);
+        plot.drawNormalizedLine(0.01 + 0.0005 * (width+2),0.925, 0.01 + 0.0005 * (width+2), 0.995);
+        plot.drawNormalizedLine(0.011, 0.99, 0.01 + 0.0005 * (width+2), 0.99);
+
+        double diff = end - start;
+
+        for(double i = start + 25; i < end; i += 25){
+            double w = ((i-start)/diff)*width;
+            plot.drawNormalizedLine(0.01 + 0.0005 * (w+2), 0.986, 0.01 + 0.0005 * (w+2), 0.99);
+        }
+
+        for(double i = start + 50; i < end; i += 50){
+            double w = ((i-start)/diff)*width;
+            plot.drawNormalizedLine(0.01 + 0.0005 * (w+2), 0.984, 0.01 + 0.0005 * (w+2), 0.99);
+        }
+
+        for(double i = start + 100; i < end; i += 100){
+            double w = ((i-start)/diff)*width;
+            plot.drawNormalizedLine(0.01 + 0.0005 * (w+2), 0.982, 0.01 + 0.0005 * (w+2), 0.99);
+        }
+
+        plot.addLabel(0.001, 0.92, String.valueOf(start));
+        plot.addLabel(0.001 + 0.00025 * (width-5), 0.92, label);
+        plot.addLabel(0.001 + 0.0005 * (width+2), 0.92, String.valueOf(end));
+    }
+
+    public static long sum(long[] rx) {
+        long sum = 0L;
+
+        for (long l : rx) {
+            sum += l;
+        }
+
+        return sum;
+    }
+
+    public static int getThresholdBin(float threshold, long[] hist){
+        int bins = hist.length;
+        long elementSum = sum(hist);
+
+        threshold *= elementSum;
+
+        long temp = 0L;
+        for(int i = 0; i < bins; i++){
+            temp += hist[i];
+            if(temp > threshold) return i;
+        }
+
+        return 0;
+    }
+
+    public static float[][] sortMultiple(float[] a, float[] b){
+        float[] tempA = a.clone();
+        float[] tempB = new float[b.length];
+        //float[] tempC = new float[c.length];
+
+        Arrays.sort(tempA);
+        reverse(tempA);
+
+        for(int i = 0; i < a.length; i++){
+            for(int j = 0; j < a.length; j++){
+                if(a[j]==tempA[i]){
+                    tempB[i] = b[j];
+                    //tempC[i] = c[j];
+                    break;
+                }
+            }
+        }
+        //return new float[][]{tempA, tempB, tempC};
+        return new float[][]{tempA, tempB};
+    }
+
+    public static void reverse(float[] input) {
+        int last = input.length - 1;
+        int middle = input.length / 2;
+        for (int i = 0; i <= middle; i++) {
+            float temp = input[i];
+            input[i] = input[last - i];
+            input[last - i] = temp;
+        }
     }
 }
