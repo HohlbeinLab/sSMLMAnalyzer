@@ -183,10 +183,8 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
         int peaks = offsetsX.length - 1;
 
         // both the original and FFT are target size
-        float sizeX = data.getColumn(1).max() / target_size; // deltaW
-        float sizeY = data.getColumn(2).max() / target_size;
-
-        double constMul = 2.09; // Got this emperically, want to find a better value (with logic behind it)
+        float sizeX = data.getColumn(1).max() / 512; // deltaW
+        float sizeY = data.getColumn(2).max() / 512;
 
 
 
@@ -196,9 +194,11 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
             float posX = offsetsX[0] - offsetsX[i];
             float posY = offsetsY[0] - offsetsY[i];
 
-            double dist = constMul * Math.sqrt(Math.pow(posX * sizeX, 2) + Math.pow(posY * sizeY, 2));
+            // this usually results in too low values
+            double dist = Math.sqrt(Math.pow(posX * sizeX, 2) + Math.pow(posY * sizeY, 2));
+            dist *= 1.04;
 
-            if(dist < 500 | dist > 4000)
+            if(dist < 400 | dist > 4000)
                 continue;
 
 
@@ -238,67 +238,11 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
     }
 
     public float[] getAngles(){
-        return new float[]{(float)  angle_low, (float)  angle_high };
+        return new float[]{(float) angle_low, (float)  angle_high };
     }
 
     public float[] getDistances(){
-        return new float[]{(float) Math.round(dist_low), (float) Math.round(dist_high)};
+        return new float[]{Math.round(dist_low), Math.round(dist_high)};
     }
 
-    public static void main(String[] args) {
-        //Change data to be static before using this
-        /*
-        ImageJ ij = new ImageJ();
-        ij.ui().showUI();
-
-
-        final String[] possible_options = {"id", "frame", "x", "y", "z", "intensity", "offset", "bkgstd", "sigma1", "sigma2", "uncertainty", "detections", "chi"};
-
-
-        String filePath = "F:\\ThesisData\\output\\4_grating_drift.csv";
-        // String filePath = "C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\temp.csv";
-        // String filePath = "C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\distance_testing.csv";
-
-        FloatMatrix floatMatrix = null;
-        List<String> collumns = new ArrayList<>();
-
-        OwnFloatMatrixLoader ownFloatMatrix = new OwnFloatMatrixLoader();
-
-        try {
-            floatMatrix =  ownFloatMatrix.loadCSVFile(filePath);
-            collumns = ownFloatMatrix.collumns;
-        } catch (IOException e) {
-            System.out.println("File not found.");
-        } catch (LapackException e) {
-            e.printStackTrace();
-        } catch (Exception e){
-            System.out.println("Does the csv start with a header?");
-            e.printStackTrace();
-        }
-
-        assert !collumns.isEmpty();
-        assert floatMatrix != null;
-
-
-        int[] revOptionsIndices = new int[possible_options.length];
-
-
-        Pattern pattern = Pattern.compile("(\\w+)( [ (\\[](\\w+)[)\\] ])?");
-
-        for(int i = 0; i < collumns.size(); i ++){
-            String header = collumns.get(i);
-            Matcher matcher = pattern.matcher(header);
-            if(matcher.find()){
-                revOptionsIndices[getTheClosestMatch(possible_options, matcher.group(1))] = i;
-            }
-        }
-
-        //frame, x, y, intensity
-        data2 = floatMatrix.getColumns(new int[]{revOptionsIndices[1], revOptionsIndices[2], revOptionsIndices[3], revOptionsIndices[5]});
-
-        ij.command().run(AngleAnalyzer.class, true);
-
-         */
-
-    }
 }

@@ -73,14 +73,6 @@ public class Util {
         return result;
     }
 
-    public static double[] toDouble(int[] A){
-        double[] result = new double[A.length];
-
-        for(int i = 0; i < A.length; i++) result[i] = A[i];
-
-        return result;
-    }
-
     public static double[] toDouble(float v){
         return new double[] {v};
     }
@@ -249,38 +241,6 @@ public class Util {
         return A;
     }
 
-    public static RealPointSampleList<FloatType> createPointList(FloatMatrix floatMatrix, int[] xyz, int intensity, float reduce, float minZ) {
-        // the number of dimensions
-        final int numDimensions = xyz.length;
-
-
-        // a list of Samples with coordinates
-        RealPointSampleList< FloatType > elements = new RealPointSampleList<>( numDimensions );
-
-        for ( int i = 0; i < floatMatrix.rows; ++i ) {
-            RealPoint point = new RealPoint( numDimensions );
-
-            for ( int d = 0; d < numDimensions - 1; ++d )
-                point.setPosition( floatMatrix.get(i, xyz[d])/reduce, d );
-
-            if(numDimensions > 2)
-                point.setPosition(floatMatrix.get(i, xyz[numDimensions - 1])-minZ, numDimensions - 1);
-
-            float value = intensity == -1 ? 1f : floatMatrix.get(i, intensity);
-            elements.add(point, new FloatType(value));
-        }
-
-        return elements;
-    }
-
-    public static long[] toLong(float[] arr){
-        long[] result = new long[arr.length];
-        for(int i = 0;i < result.length; i ++)
-            result[i] = (long) arr[i];
-
-        return result;
-    }
-
     public static ImagePlus getImageFromPoints(FloatMatrix A, float[] reduction, int width, int height){
         float[] data = new float[width * height];
         float max_intensity = A.getColumn(2).max();
@@ -301,7 +261,7 @@ public class Util {
         return sum.getSum();
     }
 
-    public static void addLutLegend(Plot plot, OwnColorTable ct, String label, double x, double y, int width, double start, double end){
+    public static void addLutLegend(Plot plot, OwnColorTable ct, String label, int width, double start, double end){
         for(int i = 0; i < width; i++){
             plot.setColor(ct.getColor(i, 0, width));
             plot.drawNormalizedLine(0.01 + 0.0005 * (i+2),0.93, 0.01 + 0.0005 * (i+2), 0.99);
@@ -328,9 +288,9 @@ public class Util {
             plot.drawNormalizedLine(0.01 + 0.0005 * (w+2), 0.982, 0.01 + 0.0005 * (w+2), 0.99);
         }
 
-        plot.addLabel(0.001, 0.92, String.valueOf(start));
+        plot.addLabel(0.001, 0.92, String.valueOf((int) start));
         plot.addLabel(0.001 + 0.00025 * (width-5), 0.92, label);
-        plot.addLabel(0.001 + 0.0005 * (width+2), 0.92, String.valueOf(end));
+        plot.addLabel(0.001 + 0.0005 * (width+2), 0.92, String.valueOf((int) end));
     }
 
     public static long sum(long[] rx) {
