@@ -67,8 +67,8 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
     private final String[] unit_prefixes = {"null", "photons", "m", "cm", "mm", "um", "nm", "ang", "pm", "fm"};
 
 
-    private String filePath = "F:\\ThesisData\\output\\output3_drift.csv";
-    //private String filePath = "F:\\ThesisData\\output\\combined_drift.csv";
+    //private String filePath = "F:\\ThesisData\\output\\output3_drift.csv";
+    private String filePath = "F:\\ThesisData\\output\\combined_drift.csv";
     //private String filePath = "F:\\ThesisData\\output\\4_grating_drift.csv";
 
 
@@ -153,7 +153,7 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
 
         gd.addMessage("------------------------------------------Visualisation------------------------------------------------------------------------------------------------------------------------------");
 
-        gd.addNumericField("Histogram binwidth (nm)", binwidth);
+        gd.addNumericField("Histogram binwidth", binwidth);
         String[] colors = ownColorTable.getLuts();
         Arrays.sort(colors);
 

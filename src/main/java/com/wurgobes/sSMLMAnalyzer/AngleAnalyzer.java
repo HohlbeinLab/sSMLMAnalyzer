@@ -51,7 +51,7 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
     private double dist_low;
     private double dist_high;
 
-    private boolean flipAngles = false;
+    private boolean flipAngles;
 
     public AngleAnalyzer(FloatMatrix data, boolean flipAngles, LogService logService){
         this.data = data;
@@ -109,6 +109,9 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
 
 
         angle = different < 0 ? angle  : angle - Math.PI;
+
+        System.out.println(angle);
+        System.out.println(std);
 
         if(flipAngles) angle -= Math.PI;
 
@@ -196,7 +199,7 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
 
             // this usually results in too low values
             double dist = Math.sqrt(Math.pow(posX * sizeX, 2) + Math.pow(posY * sizeY, 2));
-            dist *= 1.04;
+
 
             if(dist < 400 | dist > 4000)
                 continue;
@@ -227,7 +230,7 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
         double buffer = 250;
 
         dist_low = distances.get(0) - buffer/2;
-        dist_high = distances.get(distances.size() - 1) + buffer/2;
+        dist_high = distances.get(distances.size() - 1)*1.04 + buffer/2;
 
         logService.info("Angle: " + angle_low  + "-" + angle_high );
         logService.info("Distance: " + Math.round(dist_low) + "-" + Math.round(dist_high));
