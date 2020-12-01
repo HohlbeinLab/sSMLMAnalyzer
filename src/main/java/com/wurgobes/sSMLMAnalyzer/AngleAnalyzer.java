@@ -51,12 +51,18 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
     private double dist_low;
     private double dist_high;
 
-    private boolean flipAngles;
+    private final boolean flipAngles;
+    private final boolean mirrorAngles;
 
-    public AngleAnalyzer(FloatMatrix data, boolean flipAngles, LogService logService){
+    private final boolean debug;
+
+    public AngleAnalyzer(FloatMatrix data, boolean flipAngles, boolean mirrorAngles, LogService logService, boolean debug){
         this.data = data;
         this.flipAngles = flipAngles;
+        this.mirrorAngles = mirrorAngles;
         this.logService = logService;
+        this.debug = debug;
+
     }
 
     @Override
@@ -73,13 +79,13 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
 
         ImagePlus temp = getImageFromPoints(data.getColumns(new int[]{1, 2, 3}), reduce, dimensions[0], dimensions[1]);
 
-        //temp.show();
+        if(debug) temp.show();
 
         ImagePlus FFTImage = FFT.forward(temp);
 
         Directionality_ direction = new Directionality_();
 
-        //FFTImage.duplicate().show();
+        if(debug) FFTImage.duplicate().show();
 
         direction.setImagePlus(FFTImage);
         direction.setBinRange(0, 180);
@@ -110,10 +116,16 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
 
         angle = different < 0 ? angle  : angle - Math.PI;
 
-        System.out.println(angle);
-        System.out.println(std);
+        if(debug) System.out.println(angle);
+        if(debug) System.out.println(std);
 
-        if(flipAngles) angle -= Math.PI;
+        if(flipAngles) {
+            if (angle > 0) angle -= Math.PI;
+            if (angle < 0) angle += Math.PI;
+        }
+        if(mirrorAngles){
+            angle *= -1;
+        }
 
         if(std > 0.2){
             logService.info("Standard Deviation (" + std + ") seems really high." +
@@ -121,8 +133,8 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
             std = 0.2;
         } else if (std < 0.04) std = 0.04;
 
-        angle_high = angle + 1.5 * std;
-        angle_low = angle - 1.5 * std;
+        angle_high = angle + 2 * std;
+        angle_low = angle - 2 * std;
 
         if(angle_low < -Math.PI){
             angle_low += 2 * Math.PI;
@@ -137,7 +149,7 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
         ImagePlus centerImgP = ImageJFunctions.wrap(center, "center");
         ImagePlus distance = FFT.forward(centerImgP);
 
-        //distance.show();
+        if(debug) distance.show();
 
         Img<T> distanceHalf = ImageJFunctions.wrapNumeric(distance);
 
@@ -158,7 +170,7 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
 
         ImagePlus masked = ImageJFunctions.wrap(distanceCenter, "masked");
 
-        //masked.show();
+        if(debug)  masked.show();
 
         masked.getProcessor().setThreshold(minThreshold, maxThreshold, ImageProcessor.BLACK_AND_WHITE_LUT);
 
@@ -170,7 +182,7 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
         ParticleAnalyzer particleAnalyzer = new ParticleAnalyzer(SHOW_MASKS, Analyzer.getMeasurements() | Analyzer.CENTER_OF_MASS, resultsTable, 0, 100);
         particleAnalyzer.analyze(masked);
 
-        WindowManager.closeAllWindows();
+        if(!debug) WindowManager.closeAllWindows();
 
         float[] offsetsX = resultsTable.getColumn(resultsTable.getColumnIndex("XM"));
         float[] offsetsY = resultsTable.getColumn(resultsTable.getColumnIndex("YM"));
@@ -208,6 +220,7 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
             distances.add(dist);
 
             double curAngle = Math.atan2(posY, posX);
+            if(debug) System.out.println(curAngle);
             if(Math.abs(curAngle) > 0.1){
                 angles.add(curAngle);
             }
@@ -218,11 +231,10 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
                     .mapToDouble(a -> a)
                     .average().orElse(Double.NaN);
 
-            angle_low = realAngle - std*0.75;
-            angle_high = realAngle + std*0.75;
-            logService.info("Calculating the angle was inaccurate. Angle seems to be: "
-                    + realAngle
-            );
+            angle_low = angle - realAngle - std*2;
+            angle_high = angle - realAngle + std*2;
+            if(debug)
+                logService.info("Calculating the angle was inaccurate. Angle seems to be: " + realAngle);
         }
 
 
@@ -230,7 +242,7 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
         double buffer = 250;
 
         dist_low = distances.get(0) - buffer/2;
-        dist_high = distances.get(distances.size() - 1)*1.04 + buffer/2;
+        dist_high = distances.get(distances.size() - 1)*1.10 + buffer/2;
 
         logService.info("Angle: " + angle_low  + "-" + angle_high );
         logService.info("Distance: " + Math.round(dist_low) + "-" + Math.round(dist_high));

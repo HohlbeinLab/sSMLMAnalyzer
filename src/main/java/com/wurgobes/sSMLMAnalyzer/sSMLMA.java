@@ -70,6 +70,7 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
     //private String filePath = "F:\\ThesisData\\output\\output3_drift.csv";
     //private String filePath = "F:\\ThesisData\\output\\combined_drift.csv";
     private String filePath = "F:\\ThesisData\\output\\4_grating_drift.csv";
+    //private String filePath = "C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\mystery.csv";
 
 
     //private String CSV_FILE_NAME = "C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\grating_cleaned.csv";
@@ -105,6 +106,7 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
     private OwnColorTable ownColorTable;
 
     private boolean flipAngles = false;
+    private boolean mirrorAngles = false;
 
     private static boolean runningFromIDE = false;
 
@@ -140,7 +142,9 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
 
         gd.addCheckbox("Flip angle?", flipAngles);
         gd.addToSameRow();
-        gd.addMessage("Sometimes the angle might be calculated 180 degrees off.\nIf all orders contain the same amount of points, check this box.");
+        gd.addCheckbox("Mirror angle?", mirrorAngles);
+        gd.addToSameRow();
+        gd.addMessage("Sometimes the angle might be calculated 180 degrees off, or mirrored.\n Change these boxes if you get very few or no points.");
 
         gd.addMessage("------------------------------------------Filtering------------------------------------------------------------------------------------------------------------------------------");
 
@@ -177,6 +181,7 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
         distRange[1] = (float) gd.getNextNumber();
 
         flipAngles = gd.getNextBoolean();
+        mirrorAngles = gd.getNextBoolean();
 
         orders = (int) gd.getNextNumber();
 
@@ -228,8 +233,8 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
             OwnFloatMatrixLoader ownFloatMatrix = new OwnFloatMatrixLoader();
 
             if(debug) {
-                filePath = CSV_FILE_NAME;
-                processing = false;
+                //filePath = CSV_FILE_NAME;
+                //processing = false;
                 try {
                     System.out.println("Found " + ownColorTable.getLuts().length + " LUTs");
                     System.out.println(Arrays.toString(ownColorTable.getLuts()));
@@ -238,6 +243,8 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
                     System.out.println("Failed to set LUT");
                     System.exit(0);
                 }
+                flipAngles = true;
+                mirrorAngles = true;
             }
 
             try {
@@ -283,7 +290,7 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
                 data = floatMatrix.getColumns(new int[]{revOptionsIndices[1], revOptionsIndices[2], revOptionsIndices[3], revOptionsIndices[5]});
 
                 if(angRange[0] * angRange[1] * distRange[0] * distRange[1] == 0){
-                    AngleAnalyzer<T> angleAnalyzer = new AngleAnalyzer<>(data, flipAngles, logService);
+                    AngleAnalyzer<T> angleAnalyzer = new AngleAnalyzer<>(data, flipAngles, mirrorAngles,logService, debug);
                     angleAnalyzer.run();
 
 
@@ -537,7 +544,7 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
     }
 
     public static void main(String[] args) {
-        debug = false;
+        debug = true;
         runningFromIDE = true; //this is really dumb
 
         net.imagej.ImageJ ij = new ImageJ();
