@@ -68,8 +68,8 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
 
 
     //private String filePath = "F:\\ThesisData\\output\\output3_drift.csv";
-    private String filePath = "F:\\ThesisData\\output\\combined_drift.csv";
-    //private String filePath = "F:\\ThesisData\\output\\4_grating_drift.csv";
+    //private String filePath = "F:\\ThesisData\\output\\combined_drift.csv";
+    private String filePath = "F:\\ThesisData\\output\\4_grating_drift.csv";
 
 
     //private String CSV_FILE_NAME = "C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\grating_cleaned.csv";
