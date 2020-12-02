@@ -73,17 +73,19 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
     //private String filePath = "C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\mystery.csv";
 
 
-    //private String CSV_FILE_NAME = "C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\grating_cleaned.csv";
-    private String CSV_FILE_NAME = "C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\temp.csv";
-    //private String CSV_FILE_NAME = "F:\\ThesisData\\output\\results1.csv";
+    //private String csv_target_dir = "C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\grating_cleaned.csv";
+    private String csv_target_dir = "C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\results";
+    //private String csv_target_dir = "F:\\ThesisData\\output\\results1.csv";
 
-    private boolean saveSCV = false;
+    private boolean saveSCV = true;
 
     private float[] angRange = new float[] {0, 0};
+    //private float[] angRange = new float[] {(float) (-0.03 * Math.PI), (float) (0.07 * Math.PI)};
     //private final float[] angRange = {(float) (-1 * Math.PI), (float) (-0.95 * Math.PI) }; //more than and less than
 
 
     private float[] distRange = new float[] {0, 0}; //default was {1500, 2500}
+    //private float[] distRange = new float[] {1500, 2200};
     //private final float[] distRange = {1940, 2600}; //1800 3000 (1940, 2240)
 
 
@@ -111,6 +113,8 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
     private static boolean runningFromIDE = false;
 
     private String defaultLUT = "Spectrum.LUT";
+    private float[] lutRange = new float[]{0,0};
+    private boolean visualisation = true;
 
 
     public int setup(){
@@ -122,7 +126,7 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
 
         gd.addCheckbox("Save to CSV?", saveSCV);
         gd.addToSameRow();
-        gd.addFileField("CSV output", CSV_FILE_NAME, 25);
+        gd.addDirectoryField("CSV output directory", csv_target_dir, 25);
 
         gd.addMessage("------------------------------------------Angles and Distances------------------------------------------------------------------------------------------------------------------------------");
 
@@ -157,12 +161,20 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
 
         gd.addMessage("------------------------------------------Visualisation------------------------------------------------------------------------------------------------------------------------------");
 
+        gd.addCheckbox("Visualise results", visualisation);
+
         gd.addNumericField("Histogram binwidth", binwidth);
         String[] colors = ownColorTable.getLuts();
         Arrays.sort(colors);
 
+
         if(runningFromIDE) defaultLUT = "NCSA PalEdit/royal.lut";
         gd.addChoice("LUT", colors, defaultLUT);
+
+        gd.addMessage("Modifies the LUT range of the distances. Will use the calculated distance ranges if not set.");
+        gd.addNumericField("Start LUT", lutRange[0]);
+        gd.addToSameRow();
+        gd.addNumericField("End LUT", lutRange[1]);
 
         gd.showDialog();
 
@@ -172,7 +184,7 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
         filePath = gd.getNextString();
 
         saveSCV = gd.getNextBoolean();
-        CSV_FILE_NAME = gd.getNextString();
+        csv_target_dir = gd.getNextString();
 
         angRange[0] = (float) gd.getNextNumber();
         angRange[1] = (float) gd.getNextNumber();
@@ -189,6 +201,7 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
         neighbours = (int) gd.getNextNumber();
         cleanDistance = (float) gd.getNextNumber();
 
+        visualisation = gd.getNextBoolean();
         binwidth = (float) gd.getNextNumber();
 
         try {
@@ -203,12 +216,15 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
 
         }
 
+        lutRange[0] = (float) gd.getNextNumber();
+        lutRange[1] = (float) gd.getNextNumber();
+
         if(filePath.equals("")){
             logService.error("No input CSV was set");
             return 0;
         }
 
-        if(saveSCV && CSV_FILE_NAME.equals("")){
+        if(saveSCV && csv_target_dir.equals("")){
             logService.error("Set saving to CSV but no filepath was provided.");
             return 0;
         }
@@ -233,8 +249,8 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
             OwnFloatMatrixLoader ownFloatMatrix = new OwnFloatMatrixLoader();
 
             if(debug) {
-                //filePath = CSV_FILE_NAME;
-                //processing = false;
+                filePath = csv_target_dir + "\\all_orders.csv";
+                processing = false;
                 try {
                     System.out.println("Found " + ownColorTable.getLuts().length + " LUTs");
                     System.out.println(Arrays.toString(ownColorTable.getLuts()));
@@ -303,6 +319,8 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
                     distRange[0] = distRange[0] == 0f ? distResult[0] : distRange[0];
                     distRange[1] = distRange[1] == 0f ? distResult[1] : distRange[1];
 
+                    lutRange[0] = distRange[0] == 0f ? distResult[0] : lutRange[0];
+                    lutRange[1] = distRange[1] == 0f ? distResult[1] : lutRange[1];
 
                     if(distRange[0] > distRange[1]) {
                         logService.error("The distance had to be positive: " + distRange[0] + " is larger than " + distRange[1]);
@@ -447,25 +465,7 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
                     finalPossibilities = cleanup(finalPossibilities, neighbours, cleanDistance);
                 }
 
-                if (saveSCV) {
-                    //Create Header
-                    List<String> Headers = new ArrayList<>();
-                    Headers.add("id");
-                    Headers.add("frame");
-                    String distanceUnit = (unit_prefixes[unitsIndices[revOptionsIndices[2]]].equals(unit_prefixes[unitsIndices[revOptionsIndices[3]]]) ? unit_prefixes[unitsIndices[revOptionsIndices[2]]] : ("(" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "*" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + ")^½"));
-                    for (int i = 0; i < orders; i++) {
-                        Headers.add(i + " index");
-                        Headers.add(i + " x [" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "]");
-                        Headers.add(i + " y [" + unit_prefixes[unitsIndices[revOptionsIndices[3]]] + "]");
-                        Headers.add(i + " intensity [" + unit_prefixes[unitsIndices[revOptionsIndices[5]]] + "]");
-                        if (i > 0) {
-                            Headers.add((i - 1) + "-" + i + " distance" + distanceUnit);
-                            Headers.add((i - 1) + "-" + i + "angle");
-                        }
-                    }
 
-                    SaveCSV(finalPossibilities, Headers, CSV_FILE_NAME);
-                }
 
 
                 processingTime = System.nanoTime() - processingTime;
@@ -481,70 +481,122 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
 
             System.gc();
 
+
+
             if(finalPossibilities.rows < 10){
                 logService.info("No pairs detected. Try flipping the angle or manually adjusting the distance and angles.");
             } else {
-                HistogramWindow[] histograms = new HistogramWindow[orders - 1];
 
-                for (int i = 0; i < orders - 1; i++) {
-                    FloatMatrix relevantData;
-                    if (i == 0) {
-                        relevantData = finalPossibilities.getColumn(10);
-                    } else {
-                        relevantData = finalPossibilities.getColumn(10 + (i * orderCollumns));
-                        relevantData = relevantData.get(relevantData.ne(0.0f).findIndices());
+                //id, frame, x, y, intensity, distance
+                final FloatMatrix halfOrderMatrix = new FloatMatrix(finalPossibilities.rows, orderCollumns);
+
+                halfOrderMatrix.putColumn(0, finalPossibilities.getColumn(0));
+                halfOrderMatrix.putColumn(1, finalPossibilities.getColumn(1));
+                halfOrderMatrix.putColumn(4, finalPossibilities.getColumn(5));
+                halfOrderMatrix.putColumn(5, finalPossibilities.getColumn(10));
+
+                FloatMatrix xIntemediate = finalPossibilities.getColumn(3).add(finalPossibilities.getColumn(7)).divi(2.0f);
+                FloatMatrix yIntemediate = finalPossibilities.getColumn(4).add(finalPossibilities.getColumn(8)).divi(2.0f);
+
+                halfOrderMatrix.putColumn(2, xIntemediate);
+                halfOrderMatrix.putColumn(3, yIntemediate);
+
+                if(visualisation) {
+                    HistogramWindow[] histograms = new HistogramWindow[orders - 1];
+
+                    for (int i = 0; i < orders - 1; i++) {
+                        FloatMatrix relevantData;
+                        if (i == 0) {
+                            relevantData = finalPossibilities.getColumn(10);
+                        } else {
+                            relevantData = finalPossibilities.getColumn(10 + (i * orderCollumns));
+                            relevantData = relevantData.get(relevantData.ne(0.0f).findIndices());
+                        }
+
+                        System.out.println("Found " + relevantData.rows + " connections in the " + getTitleHist(i) + " order");
+                        if (relevantData.rows < 50) {
+                            orders = i + 1;
+                            break;
+                        } //No relevant amount of data above this point
+                        ImagePlus dummy = new ImagePlus("", new FloatProcessor(relevantData.toArray2()));
+                        histograms[i] = new HistogramWindow(getTitleHist(i), dummy, getBins(relevantData, binwidth), distRange[0], distRange[1]);
+                        if (runningFromIDE) histograms[i].getImagePlus().show();
                     }
 
-                    System.out.println("Found " + relevantData.rows + " connections in the " + getTitleHist(i) + " order");
-                    if (relevantData.rows < 50) {
-                        orders = i + 1;
-                        break;
-                    } //No relevant amount of data above this point
-                    ImagePlus dummy = new ImagePlus("", new FloatProcessor(relevantData.toArray2()));
-                    histograms[i] = new HistogramWindow(getTitleHist(i), dummy, getBins(relevantData, binwidth), distRange[0], distRange[1]);
-                    if (runningFromIDE) histograms[i].getImagePlus().show();
+                    ImagePlus Angles = new ImagePlus("", new FloatProcessor(finalPossibilities.getColumn(11).toArray2()));
+                    new HistogramWindow("Angles", Angles, getBins(finalPossibilities.getColumn(11), 0.005f), angRange[0], angRange[1]).getImagePlus().show();
+
+
+                    ///////////////////////////////////////////////////////////// PLOTS
+                    String[] colors = {"blue", "red", "green", "black"};
+                    String[] shapes = {"cross", "circle", "box", "diamond"};//  "line", "connected circle", "filled", "bar", "separated bar", "circle", "box", "triangle", "diamond", "cross", "x", "dot", "error bars" or "xerror bars"
+
+
+                    //////////////////////////////////////////////
+                    Plot orderPlot = new Plot("Orders", "x", "y");
+
+                    orderPlot.setColor(colors[0]); //0th
+                    orderPlot.add(shapes[0], toDouble(finalPossibilities.getColumn(3)), toDouble(finalPossibilities.getColumn(4)));
+                    for (int i = 1; i < orders; i++) {
+                        orderPlot.setColor(colors[i]);
+                        orderPlot.add(shapes[i], toDouble(finalPossibilities.getColumn(1 + (i * orderCollumns))), toDouble(finalPossibilities.getColumn(2 + (i * orderCollumns))));
+                    }
+
+                    orderPlot.setLegend(getTitlePlot(orders), Plot.AUTO_POSITION);
+                    orderPlot.show();
+                    //////////////////////////////////////////////
+
+                    Plot distancePlot = new Plot("Distance", "x [" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "]", "y [" + unit_prefixes[unitsIndices[revOptionsIndices[3]]] + "]");
+
+                    for (int i = 0; i < finalPossibilities.rows; i++) {
+                        distancePlot.setColor(ownColorTable.getColor(finalPossibilities.get(i, 10), distRange[0], distRange[1]));
+
+                        //distancePlot.add(shapes[0], toDouble(finalPossibilities.get(i, 3)), toDouble(finalPossibilities.get(i, 4))); // 3 4
+                        distancePlot.add(shapes[0], toDouble(halfOrderMatrix.get(i, 2)), toDouble(halfOrderMatrix.get(i, 3))); // 3 4
+                    }
+
+                    distancePlot.setLimitsToFit(true);
+                    addLutLegend(distancePlot, ownColorTable, "Distance", 512, distRange[0], distRange[1]);
+                    distancePlot.show();
+                    distancePlot.setLimits(Float.NaN, Float.NaN, Float.NaN, Float.NaN);
+
                 }
 
-                ImagePlus Angles = new ImagePlus("", new FloatProcessor(finalPossibilities.getColumn(11).toArray2()));
-                new HistogramWindow("Angles", Angles, getBins(finalPossibilities.getColumn(11), 0.005f), angRange[0], angRange[1]).getImagePlus().show();
+                if (saveSCV) {
+                    //Create Header
+                    List<String> LongHeader = new ArrayList<>();
+                    List<String> ShortHeader = new ArrayList<>();
+                    LongHeader.add("id");
+                    ShortHeader.add("id");
+                    LongHeader.add("frame");
+                    ShortHeader.add("frame");
 
+                    String distanceUnit = (unit_prefixes[unitsIndices[revOptionsIndices[2]]].equals(unit_prefixes[unitsIndices[revOptionsIndices[3]]]) ? unit_prefixes[unitsIndices[revOptionsIndices[2]]] : ("(" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "*" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + ")^½"));
+                    for (int i = 0; i < orders; i++) {
+                        LongHeader.add("index " + i);
+                        LongHeader.add("x [" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "] " + i);
+                        LongHeader.add("y [" + unit_prefixes[unitsIndices[revOptionsIndices[3]]] + "] " + i);
+                        LongHeader.add("intensity [" + unit_prefixes[unitsIndices[revOptionsIndices[5]]] + "] " + i);
+                        if (i > 0) {
+                            LongHeader.add((i - 1) + "-" + i + " distance [" + distanceUnit + "]");
+                            LongHeader.add((i - 1) + "-" + i + "angle");
+                        }
+                    }
+                    ShortHeader.add("x [" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "]");
+                    ShortHeader.add("y [" + unit_prefixes[unitsIndices[revOptionsIndices[3]]] + "]");
+                    ShortHeader.add("intensity [" + unit_prefixes[unitsIndices[revOptionsIndices[5]]] + "]");
+                    ShortHeader.add("z [" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "]");
 
-                Plot orderPlot = new Plot("Orders", "x", "y");
-
-                String[] colors = {"blue", "red", "green", "black"};
-                String[] shapes = {"circle", "cross", "box", "diamond"};//  "line", "connected circle", "filled", "bar", "separated bar", "circle", "box", "triangle", "diamond", "cross", "x", "dot", "error bars" or "xerror bars"
-
-
-                orderPlot.setColor(colors[0]); //0th
-                orderPlot.add(shapes[0], toDouble(finalPossibilities.getColumn(3)), toDouble(finalPossibilities.getColumn(4)));
-                for (int i = 1; i < orders; i++) {
-                    orderPlot.setColor(colors[i]);
-                    orderPlot.add(shapes[i], toDouble(finalPossibilities.getColumn(1 + (i * orderCollumns))), toDouble(finalPossibilities.getColumn(2 + (i * orderCollumns))));
+                    SaveCSV(finalPossibilities, LongHeader, csv_target_dir + "\\all_orders.csv");
+                    SaveCSV(halfOrderMatrix, ShortHeader, csv_target_dir + "\\accurate_positions.csv");
+                    SaveCSV(finalPossibilities.getColumns(new int[]{0, 1, 3, 4, 5, 10}), ShortHeader, csv_target_dir + "\\thunderSTORM.csv");
                 }
-
-                orderPlot.setLegend(getTitlePlot(orders), Plot.AUTO_POSITION);
-                orderPlot.show();
-
-
-                Plot distancePlot = new Plot("Distance", "x [" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "]", "y [" + unit_prefixes[unitsIndices[revOptionsIndices[3]]] + "]");
-
-                for (int i = 0; i < finalPossibilities.rows; i++) {
-                    distancePlot.setColor(ownColorTable.getColor(finalPossibilities.get(i, 10), distRange[0] * 1.05, distRange[1] * 0.95));
-
-                    distancePlot.add(shapes[0], toDouble(finalPossibilities.get(i, 3)), toDouble(finalPossibilities.get(i, 4))); // 3 4
-                }
-
-                distancePlot.setLimitsToFit(true);
-                addLutLegend(distancePlot, ownColorTable, "Distance", 512, distRange[0] * 1.05, distRange[1] * 0.95);
-                distancePlot.show();
-                distancePlot.setLimits(Float.NaN, Float.NaN, Float.NaN, Float.NaN);
-
             }
         }
     }
 
     public static void main(String[] args) {
-        debug = true;
+        debug = false;
         runningFromIDE = true; //this is really dumb
 
         net.imagej.ImageJ ij = new ImageJ();

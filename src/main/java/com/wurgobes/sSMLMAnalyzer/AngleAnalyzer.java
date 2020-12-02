@@ -241,7 +241,7 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
 
         double buffer = 250;
 
-        dist_low = distances.get(0) - buffer/2;
+        dist_low = distances.get(0) * 0.90 - buffer/2;
         dist_high = distances.get(distances.size() - 1)*1.10 + buffer/2;
 
         logService.info("Angle: " + angle_low  + "-" + angle_high );

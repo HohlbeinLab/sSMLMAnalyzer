@@ -19,8 +19,12 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import static ij.util.ThreadUtil.createThreadArray;
+import static ij.util.ThreadUtil.startAndJoin;
 import static org.jblas.MatrixFunctions.*;
 
 
@@ -121,31 +125,44 @@ public class Util {
     public static String getTitlePlot(int orders){
         StringBuilder title = new StringBuilder();
         for(int i = 0; i < orders; i++){
-            title.append(getOrdinal(i) + "\n");
+            title.append(getOrdinal(i)).append("\n");
         }
         return title.toString();
     }
 
-    public static FloatMatrix cleanup(FloatMatrix A, int neighbours, float distance){
-        List<Integer> indices = new ArrayList<>();
+    public static FloatMatrix cleanup(final FloatMatrix A, int neighbours, float distance){
+        List<Integer> test = Collections.synchronizedList(new ArrayList<>());
 
-        FloatMatrix X = A.getColumn(3);
-        FloatMatrix Y = A.getColumn(4);
+        final FloatMatrix X = A.getColumn(3);
+        final FloatMatrix Y = A.getColumn(4);
 
+        AtomicInteger ai = new AtomicInteger(0);
+        final Thread[] threads = createThreadArray(); //Get maximum of threads
 
-        for(int i = 0; i < A.rows; i++){
-            IJ.showProgress(i, A.rows);
-            if(i % 1000 == 0) System.out.println(i);
-            float x = A.get(i, 3);
-            float y = A.get(i, 4);
+        final int rows = A.rows;
+        //Set the run function for each thread
+        for (int ithread = 0; ithread < threads.length; ithread++) {
+            threads[ithread] = new Thread(() -> {
+                for (int row = ai.getAndIncrement(); row <= rows; row = ai.getAndIncrement()) {
+                    final int currentAI = ai.get();
+                    if (currentAI % 1000 == 0) System.out.println("\r" + currentAI + "/" + rows);
+                    IJ.showProgress(currentAI, rows);
+                    IJ.showStatus(currentAI + "/" + rows);
 
-            FloatMatrix distances = Distance(X.sub(x), Y.sub(y));
+                    final float x = A.get(row, 3);
+                    final float y = A.get(row, 4);
 
-            if(distances.lt(distance).sum() > neighbours + 1) indices.add(i);
+                    final FloatMatrix distances = Distance(X.sub(x), Y.sub(y));
+
+                    if(distances.lt(distance).sum() > neighbours + 1) test.add(row);
+                }
+            });
         }
 
-        int[] indices2 =  indices.stream().mapToInt(i->i).toArray();
-        return A.getRows(indices2);
+        startAndJoin(threads);
+
+        int[] indices =  test.stream().mapToInt(i->i).toArray();
+        return A.getRows(indices);
     }
 
     public static FloatMatrix connectOrders(FloatMatrix intermediate, int orders, int orderCollumns){
