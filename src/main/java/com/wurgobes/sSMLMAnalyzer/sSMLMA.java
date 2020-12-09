@@ -1,8 +1,5 @@
 package com.wurgobes.sSMLMAnalyzer;
 
-
-
-import gnu.trove.impl.sync.TSynchronizedShortByteMap;
 import ij.*;
 
 import ij.gui.HistogramWindow;
@@ -15,6 +12,7 @@ import net.imagej.ImageJ;
 import net.imagej.lut.LUTService;
 
 import net.imglib2.type.numeric.IntegerType;
+
 
 import org.scijava.command.Command;
 import org.scijava.log.LogService;
@@ -43,11 +41,6 @@ import static com.wurgobes.sSMLMAnalyzer.levenshtein.getTheClosestMatch;
 import static ij.util.ThreadUtil.*;
 
 
-
-// test flip z for artifact
-
-// put 1/2th order into seperate file
-// make thunderSTORM z plot file
 
 @Plugin(type = Command.class, menuPath = "Plugins>Spectral Analyzer>Analyze Pairs")
 public class  sSMLMA < T extends IntegerType<T>> implements Command {
@@ -112,11 +105,15 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
 
 
     private boolean searchAngle = true;
+    private boolean deepSearchAngle = false;
     private boolean doingRetry = false;
     private boolean flipAngles = false;
     private boolean mirrorAngles = false;
 
     private final boolean[][] perm = new boolean[][]{{false, false}, {false, true}, {true, false}, {true, true}};
+    private final FloatMatrix[] angleResults = new FloatMatrix[perm.length];
+    private boolean retry = false;
+    private boolean foundBestResult = false;
 
     private static boolean runningFromIDE = false;
 
@@ -164,6 +161,9 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
         gd.addCheckbox("Search for angles?", searchAngle);
         gd.addToSameRow();
         gd.addMessage("Sometimes the angle is not correctly calculated the first time. With this setting the plugin will search for the correct angle and tell you what settings it used.");
+        gd.addCheckbox("Search for the angle with the most pairs?", deepSearchAngle);
+        gd.addToSameRow();
+        gd.addMessage("Try and find the permutation of above options that results in the most pairs.");
 
         gd.addMessage("------------------------------------------Filtering------------------------------------------------------------------------------------------------------------------------------");
 
@@ -213,7 +213,7 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
         mirrorAngles = gd.getNextBoolean();
 
         searchAngle = gd.getNextBoolean();
-
+        deepSearchAngle = gd.getNextBoolean();
 
         toCleanup = gd.getNextBoolean();
         neighbours = (int) gd.getNextNumber();
@@ -543,7 +543,8 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
             // true, true
             // Nothing
 
-            boolean retry = false;
+
+
 
             if(finalPossibilities.rows < 10) {
                 logService.info("No pairs detected. Try flipping the angle or manually adjusting the distance and angles.");
@@ -569,36 +570,68 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
                 else logService.info("The right tail of the angle histogram seems to be partially cut-off");
             }
 
-            if(retry && searchAngle) {
+            if((retry && searchAngle) | deepSearchAngle) {
                 boolean[] curr_perm = new boolean[]{flipAngles, mirrorAngles};
 
                 for(int i = 0; i < perm.length ; i++){
                     if(Arrays.equals(perm[i], curr_perm)){
-
+                        angleResults[i] = new FloatMatrix();
+                        angleResults[i].copy(finalPossibilities);
                         perm[i] = null;
 
                         if(perm[(i+1)%perm.length] != null){
                             flipAngles = perm[(i+1)%perm.length][0];
                             mirrorAngles = perm[(i+1)%perm.length][1];
-                        } else {
-                            logService.info("Exhausted all options. Are there pairs in this dataset?");
                         }
                         break;
                     }
                 }
 
 
-                doingRetry = true;
 
-                angRange[0] = angInput[0] == 0f ? angInput[0] : angRange[0];
-                angRange[1] = angInput[1] == 0f ? angInput[1] : angRange[1];
 
-                distRange[0] = distInput[0] == 0f ? distInput[0] : distRange[0];
-                distRange[1] = distInput[1] == 0f ? distInput[1] : distRange[1];
+                boolean all_filled = true;
+                for(FloatMatrix result : angleResults){
+                    if (result == null) {
+                        all_filled = false;
+                        break;
+                    }
+                }
+                if(!all_filled){
+                    doingRetry = true;
 
-                run();
+                    angRange[0] = angInput[0] == 0f ? angInput[0] : angRange[0];
+                    angRange[1] = angInput[1] == 0f ? angInput[1] : angRange[1];
+
+                    distRange[0] = distInput[0] == 0f ? distInput[0] : distRange[0];
+                    distRange[1] = distInput[1] == 0f ? distInput[1] : distRange[1];
+
+                    run();
+
+                } else {
+                    int max = angleResults[0].rows;
+                    int ind = 0;
+                    for(int i = 1; i < angleResults.length; i++){
+                        if(angleResults[i].rows > max) {
+                            max = angleResults[i].rows;
+                            ind = i;
+                        }
+
+                    }
+                    finalPossibilities = angleResults[ind];
+
+                    angRange[0] = finalPossibilities.getColumn(11).min();
+                    angRange[1] = finalPossibilities.getColumn(11).max();
+
+                    distRange[0] = finalPossibilities.getColumn(10).min();
+                    distRange[1] = finalPossibilities.getColumn(10).max();
+
+                    foundBestResult = true;
+                }
+
             }
-            else {
+            if(!(retry && searchAngle) | (foundBestResult && deepSearchAngle)) {
+                foundBestResult = true;
 
                 if (processing && toCleanup) {
                     IJ.showStatus("Cleaning Data");
@@ -673,7 +706,7 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
                         histograms[i] = new HistogramWindow(getTitleHist(i), dummy, getBins(relevantData, binwidth), distRange[0], distRange[1]);
                         if (runningFromIDE) histograms[i].getImagePlus().show();
                     }
-
+                    /////////////////
                     ImagePlus Angles = new ImagePlus("", new FloatProcessor(finalPossibilities.getColumn(11).toArray2()));
                     HistogramWindow angleHist = new HistogramWindow("Angles", Angles, getBins(finalPossibilities.getColumn(11), 0.005f), angRange[0], angRange[1]);
                     if(runningFromIDE) angleHist.getImagePlus().show();
