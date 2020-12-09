@@ -5,12 +5,10 @@ import ij.ImagePlus;
 import ij.gui.Plot;
 import ij.process.FloatProcessor;
 
-import net.imglib2.RealPoint;
-import net.imglib2.RealPointSampleList;
 import net.imglib2.type.numeric.RealType;
-import net.imglib2.type.numeric.real.FloatType;
 import net.imglib2.util.RealSum;
 
+import org.apache.commons.math3.stat.descriptive.moment.StandardDeviation;
 import org.jblas.FloatMatrix;
 
 import java.io.File;
@@ -72,13 +70,17 @@ public class Util {
     public static double[] toDouble(FloatMatrix A){
         double[] result = new double[A.length];
 
-        for(int i = 0; i < A.length; i++) result[i] = (double) A.get(i);
+        for(int i = 0; i < A.length; i++) result[i] = A.get(i);
 
         return result;
     }
 
     public static double[] toDouble(float v){
         return new double[] {v};
+    }
+
+    public static double[] toDouble(List<Integer> list){
+        return list.stream().mapToDouble(i->i).toArray();
     }
 
     public static FloatMatrix extend(FloatMatrix A, int rows, int collumns){
@@ -200,7 +202,7 @@ public class Util {
     }
 
     private static FloatMatrix recursiveSearch(FloatMatrix intermediate, FloatMatrix rowData, int[] connected_indices, int order, int max_order, int orderCollumns) {
-        //i.e. 10: id, 11: x, 12: y, 13: distance, 14: angle
+        //i.e. 12: id, 13: x, 14: y, 15: intensity, 16: distance, 17: angle
         int[] target_range = new int[]{order * orderCollumns, 1 + (order * orderCollumns), 2 + (order * orderCollumns), 3 + (order * orderCollumns), 4 + (order * orderCollumns), 5 + (order * orderCollumns)};
 
         if (connected_indices.length == 1) {
@@ -320,6 +322,14 @@ public class Util {
         return sum;
     }
 
+    public static int sum(boolean[] rx){
+        int sum = 0;
+        for(boolean b : rx){
+            sum += b ? 1 : 0;
+        }
+        return sum;
+    }
+
     public static int getThresholdBin(float threshold, long[] hist){
         int bins = hist.length;
         long elementSum = sum(hist);
@@ -364,5 +374,50 @@ public class Util {
             input[i] = input[last - i];
             input[last - i] = temp;
         }
+    }
+
+    public static double calcSTD(FloatMatrix A){
+        StandardDeviation std = new StandardDeviation();
+        return std.evaluate(toDouble(A));
+    }
+
+
+
+    public static boolean[][] checkForRetry(FloatMatrix A){
+        StandardDeviation std = new StandardDeviation();
+
+        double min = A.min();
+        double max = A.max();
+
+        double width = 0.005f;
+
+        double lowerbins = A.le((float) (min + width)).sum();
+        double upperbins = A.ge((float) (max - width)).sum();
+
+        List<Integer> bins = new ArrayList<>();
+        for(double i = min; i < max; i += width){
+            bins.add((int) A.ge((float) (i - width)).and(A.le((float) (i + width))).sum());
+        }
+
+        int maxVal = Collections.max(bins);
+        int minVal = Collections.min(bins);
+        int maxIdx = bins.indexOf(maxVal);
+        int minIdx = bins.indexOf(minVal);
+
+        /*
+        System.out.println(lowerbins);
+        System.out.println(upperbins);
+        System.out.println(middlebins);
+        System.out.println(maxVal);
+        System.out.println(minVal);
+        System.out.println(maxIdx);
+        System.out.println(A.rows);
+        System.out.println(std.evaluate(toDouble(bins)));
+        System.out.println(Arrays.toString(bins.toArray()));
+        */
+
+        double buffer = 0.2;
+
+        return new boolean[][] {{(std.evaluate(toDouble(bins)) / A.rows) > 0.05, minIdx < bins.size()*buffer || minIdx > bins.size()*(1-buffer), maxIdx > (bins.size() * 0.4) || maxIdx < (bins.size() * 0.6)}, {Math.abs(upperbins - lowerbins) > Math.max(upperbins, lowerbins) * 0.2, lowerbins > upperbins}};
     }
 }
