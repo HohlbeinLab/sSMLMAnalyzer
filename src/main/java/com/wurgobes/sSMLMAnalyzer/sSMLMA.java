@@ -40,11 +40,11 @@ import static com.wurgobes.sSMLMAnalyzer.Util.*;
 import static com.wurgobes.sSMLMAnalyzer.levenshtein.getTheClosestMatch;
 import static ij.util.ThreadUtil.*;
 
-
+// add intensity checks (higher orders should always be lower than the 0th order)
+// ZOLA integration
 
 @Plugin(type = Command.class, menuPath = "Plugins>Spectral Analyzer>Analyze Pairs")
 public class  sSMLMA < T extends IntegerType<T>> implements Command {
-
 
     @Parameter
     private LogService logService;
@@ -74,13 +74,12 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
     private boolean saveSCV = true;
 
     private float[] angRange = new float[] {0, 0};
-    private float[] angInput = new float[] {0, 0};
+
     //private float[] angRange = new float[] {(float) (-0.03 * Math.PI), (float) (0.07 * Math.PI)};
     //private final float[] angRange = {(float) (-1 * Math.PI), (float) (-0.95 * Math.PI) }; //more than and less than
 
 
     private float[] distRange = new float[] {0, 0}; //default was {1500, 2500}
-    private float[] distInput = new float[] {0, 0};
     //private float[] distRange = new float[] {1500, 2200};
     //private final float[] distRange = {1940, 2600}; //1800 3000 (1940, 2240)
 
@@ -91,6 +90,9 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
 
 
     private float binwidth = 2.5f;
+
+    private float[] angInput = new float[] {0, 0};
+    private float[] distInput = new float[] {0, 0};
 
 
     private boolean toCleanup = false;
@@ -114,12 +116,16 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
     private final FloatMatrix[] angleResults = new FloatMatrix[perm.length];
     private boolean retry = false;
     private boolean foundBestResult = false;
+    private boolean displayInfo = true;
 
     private static boolean runningFromIDE = false;
 
     private String defaultLUT = "Spectrum.lut";
     private float[] lutRange = new float[]{0,0};
     private boolean visualisation = true;
+
+    private boolean checkForIntensity = true;
+    private final float ratioIntensity = 1.2f;
 
     int[] revOptionsIndices;
     int[] unitsIndices;
@@ -152,6 +158,9 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
 
         gd.addNumericField("Number of Orders", orders);
 
+        gd.addCheckbox("Intensity Order Required?", checkForIntensity);
+        gd.addToSameRow();
+        gd.addMessage("Require that each next order has less intensity than the previous one.");
 
         gd.addCheckbox("Flip angle?", flipAngles);
         gd.addToSameRow();
@@ -208,6 +217,8 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
         distInput[1] = (float) gd.getNextNumber();
 
         orders = (int) gd.getNextNumber();
+
+        checkForIntensity = gd.getNextBoolean();
 
         flipAngles = gd.getNextBoolean();
         mirrorAngles = gd.getNextBoolean();
@@ -369,6 +380,7 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
                 //Set the run function for each thread
                 for (int ithread = 0; ithread < threads.length; ithread++) {
                     final int finalIthread = ithread;
+                    final boolean finalIntensityCheck = checkForIntensity;
                     threads[ithread] = new Thread(() -> {
 
                         intermediateFinals[finalIthread] = new FloatMatrix(0, totalCollumns);
@@ -401,6 +413,10 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
 
                                 for (int i = 0; i < correctAngleAndDistance.length; i++) {
                                     int index = correctAngleAndDistance[i];
+                                    if(finalIntensityCheck &&
+                                            (frameData.get(index / distances.rows, 3)/
+                                            frameData.get(index % distances.rows, 3)) > ratioIntensity
+                                            ) continue;
                                     possibilities.putRow(i, extend(new FloatMatrix(1, orderColumns * 2,
                                             0,                                                  //0
                                             frame,                                                          //1
@@ -543,7 +559,7 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
             // true, true
             // Nothing
 
-
+            System.out.println(finalPossibilities.rows);
 
 
             if(finalPossibilities.rows < 10) {
@@ -630,8 +646,8 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
                 }
 
             }
-            if(!(retry && searchAngle) | (foundBestResult && deepSearchAngle)) {
-                foundBestResult = true;
+            if((!(retry && searchAngle) | (foundBestResult && deepSearchAngle)) && displayInfo) {
+                displayInfo = false;
 
                 if (processing && toCleanup) {
                     IJ.showStatus("Cleaning Data");
