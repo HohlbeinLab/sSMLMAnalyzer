@@ -113,10 +113,12 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
     private boolean mirrorAngles = false;
 
     private final boolean[][] perm = new boolean[][]{{false, false}, {false, true}, {true, false}, {true, true}};
+    private final boolean[][] permReference = new boolean[][]{{false, false}, {false, true}, {true, false}, {true, true}};
     private final FloatMatrix[] angleResults = new FloatMatrix[perm.length];
     private boolean retry = false;
     private boolean foundBestResult = false;
     private boolean displayInfo = true;
+    private int runNumber = 1;
 
     private static boolean runningFromIDE = false;
 
@@ -333,6 +335,11 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
 
             }
 
+            if(searchAngle){
+                System.out.println("Run: " + runNumber + ". Determining Angle with settings: Flip Angle: " + flipAngles  + ", Mirror Angle: " + mirrorAngles);
+            }
+
+
             double processingTime = System.nanoTime();
             final FloatMatrix data;
             FloatMatrix finalPossibilities;
@@ -516,50 +523,8 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
             System.gc();
 
 
-            //total 725k
-            //flip, mirror
-            //false, false
-            //299.40 mess
-            //0.0458 flat
-            //24k, 800
+            System.out.println("Pairs in the 0th-1st order found: " + finalPossibilities.rows);
 
-            //true, false
-            //298.77
-            //0.0459
-            //24k, 800
-
-            //flip, mirror
-            //false, true
-            //0.004465269098525473-0.1644652690985255
-            //175.4893 2 gauss
-            //0.0192 1 gauss
-            //160k, 11k
-
-            //true, true
-            //-3.1371273844912677--2.9771273844912676
-            //176.611 2 gauss
-            //0.019 1 gauss
-            //160k, 11k
-
-            //total 62k
-            //flip, mirror
-            //false false
-            // 123, 93, gauss
-            // 0.0134, gauss
-            //60k, 3k
-
-            //true, false
-            // Nothing
-
-            // false, true
-            // 123.94
-            // 0.01
-            //62k, 3k
-
-            // true, true
-            // Nothing
-
-            System.out.println(finalPossibilities.rows);
 
 
             if(finalPossibilities.rows < 10) {
@@ -643,6 +608,17 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
                     distRange[1] = finalPossibilities.getColumn(10).max();
 
                     foundBestResult = true;
+
+                    String message = "\nBest result was " + max + " pairs found.\n" +
+                        "The following values were found:\n" +
+                        "\tAngle(rad): " +  angRange[0] + " to " + angRange[1] + "\n" +
+                        "\tDistance: " +  distRange[0] + " to " + distRange[1]+ "\n" +
+                        "With the settings:\n" +
+                        "\tFlip Angle: " + permReference[ind][0] + "\n" +
+                        "\tMirror Angle: " + permReference[ind][1] + "\n";
+                    if(saveSCV) message += ("CSV files were saved to the folder: " + csv_target_dir + "\n");
+
+                    IJ.showMessage(message);
                 }
 
             }
