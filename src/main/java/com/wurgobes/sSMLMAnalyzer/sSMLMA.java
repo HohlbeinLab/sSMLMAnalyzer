@@ -61,27 +61,13 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
     private final String[] unit_prefixes = {"null", "photons", "m", "cm", "mm", "um", "nm", "ang", "pm", "fm"};
 
 
-    //private String filePath = "F:\\ThesisData\\output\\output3_drift.csv";
-    //private String filePath = "F:\\ThesisData\\output\\combined_drift.csv";
-    private String filePath = "F:\\ThesisData\\output\\4_grating_drift.csv";
-    //private String filePath = "C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\mystery.csv";
-
-
-    //private String csv_target_dir = "C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\grating_cleaned.csv";
-    private String csv_target_dir = "C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\results";
-    //private String csv_target_dir = "F:\\ThesisData\\output\\results1.csv";
+    private String filePath = "";
+    private String csv_target_dir = "";
 
     private boolean saveSCV = true;
 
-    private float[] angRange = new float[] {0, 0};
-
-    //private float[] angRange = new float[] {(float) (-0.03 * Math.PI), (float) (0.07 * Math.PI)};
-    //private final float[] angRange = {(float) (-1 * Math.PI), (float) (-0.95 * Math.PI) }; //more than and less than
-
-
-    private float[] distRange = new float[] {0, 0}; //default was {1500, 2500}
-    //private float[] distRange = new float[] {1500, 2200};
-    //private final float[] distRange = {1940, 2600}; //1800 3000 (1940, 2240)
+    private final float[] angRange = new float[] {0, 0};
+    private final float[] distRange = new float[] {0, 0}; //default was {1500, 2500}
 
 
     private int orders = 4; //This its the number of orders, including the 0th, so 3 would be 0th + 1st + 2nd
@@ -91,8 +77,8 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
 
     private float binwidth = 2.5f;
 
-    private float[] angInput = new float[] {0, 0};
-    private float[] distInput = new float[] {0, 0};
+    private final float[] angInput = new float[] {0, 0};
+    private final float[] distInput = new float[] {0, 0};
 
 
     private boolean toCleanup = false;
@@ -123,133 +109,269 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
     private static boolean runningFromIDE = false;
 
     private String defaultLUT = "Spectrum.lut";
-    private float[] lutRange = new float[]{0,0};
+    private final float[] lutRange = new float[]{0,0};
     private boolean visualisation = true;
 
-    private boolean checkForIntensity = true;
-    private final float ratioIntensity = 1.2f;
+    private boolean checkForIntensity = false;
+    private float ratioIntensity = 1.2f;
+
+    private final int coreCount = Prefs.getThreads();
 
     int[] revOptionsIndices;
     int[] unitsIndices;
     FloatMatrix floatMatrix;
     OwnFloatMatrixLoader ownFloatMatrix = new OwnFloatMatrixLoader();
 
-    public int setup(){
+    private static String debug_arg_string = "";
+
+    public int setup() {
         if (debug || doingRetry) return 1;
 
-        GenericDialogPlus gd = new GenericDialogPlus("settings");
+        String arg;
 
-        gd.addFileField("CSV input", filePath, 25);
+        if (debug_arg_string.equals("")) {
+            arg = Macro.getOptions();
+        } else {
+            arg = debug_arg_string;
+        }
+        if (arg != null && !arg.equals("")) {
+            saveSCV = false;
+            visualisation = false;
+            searchAngle = false;
 
-        gd.addCheckbox("Save to CSV?", saveSCV);
-        gd.addToSameRow();
-        gd.addDirectoryField("CSV output directory", csv_target_dir, 25);
+            String[] arguments = arg.split(" ");
+            String[] keywords = {
+                    "csv_in", "csv_out","angle_start", "angle_end",
+                    "distance_start", "distance_end",
+                    "order_number", "check_order_intensity", "check_order_ratio",
+                    "angle_flip", "angle_mirror", "angle_search", "angle_deep_search",
+                    "lone_pair_remove", "lone_pair_neighbours", "lone_pair_distance",
+                    "visualisation", "hist_binwidth", "LUT", "LUT_start", "LUT_end"
+            };
+            for(String a : arguments) {
+                if (a.contains("=")) {
+                    if (a.contains("=")) {
+                        String[] keyword_val = a.split("=");
+                        try {
+                            switch (keyword_val[0]) {
+                                case "csv_in":
+                                    filePath = keyword_val[1];
+                                    break;
+                                case "csv_out":
+                                    saveSCV = true;
+                                    csv_target_dir = keyword_val[1];
+                                    break;
+                                case "angle_start":
+                                    angRange[0] = Float.parseFloat(keyword_val[1]);
+                                    break;
+                                case "angle_end":
+                                    angRange[1] = Float.parseFloat(keyword_val[1]);
+                                    break;
+                                case "distance_start":
+                                    distRange[0] = Float.parseFloat(keyword_val[1]);
+                                    break;
+                                case "distance_end":
+                                    distRange[1] = Float.parseFloat(keyword_val[1]);
+                                    break;
+                                case "order_number":
+                                    orders = Integer.parseInt(keyword_val[1]);
+                                    break;
+                                case "check_order_intensity":
+                                    checkForIntensity = Boolean.parseBoolean(keyword_val[1]);
+                                    break;
+                                case "check_order_ratio":
+                                    ratioIntensity = Float.parseFloat(keyword_val[1]);
+                                    break;
+                                case "angle_flip":
+                                    flipAngles = Boolean.parseBoolean(keyword_val[1]);
+                                    break;
+                                case "angle_mirror":
+                                    mirrorAngles = Boolean.parseBoolean(keyword_val[1]);
+                                    break;
+                                case "angle_search":
+                                    searchAngle = Boolean.parseBoolean(keyword_val[1]);
+                                    break;
+                                case "angle_deep_search":
+                                    deepSearchAngle = Boolean.parseBoolean(keyword_val[1]);
+                                    break;
+                                case "lone_pair_remove":
+                                    toCleanup = Boolean.parseBoolean(keyword_val[1]);
+                                    break;
+                                case "lone_pair_neighbours":
+                                    neighbours = Integer.parseInt(keyword_val[1]);
+                                    break;
+                                case "lone_pair_distance":
+                                    cleanDistance = Float.parseFloat(keyword_val[1]);
+                                    break;
+                                case "visualisation":
+                                    visualisation = true;
+                                    break;
+                                case "hist_binwidth":
+                                    visualisation = true;
+                                    binwidth = Float.parseFloat(keyword_val[1]);
+                                    break;
+                                case "LUT":
+                                    visualisation = true;
+                                    defaultLUT = keyword_val[1];
+                                    break;
+                                case "LUT_start":
+                                    visualisation = true;
+                                    lutRange[0] = Float.parseFloat(keyword_val[1]);
+                                    break;
+                                case "LUT_end":
+                                    visualisation = true;
+                                    lutRange[1] = Float.parseFloat(keyword_val[1]);
+                                    break;
+                                default:
+                                    logService.error("Keyword " + keyword_val[0] + " not found\nDid you mean: " + getTheClosestMatch(keywords, keyword_val[0]) + "?");
+                                    return 0;
+                            }
+                        } catch (ArrayIndexOutOfBoundsException e) {
+                            logService.error("Malformed token: " + a + ".\nDid you remember to format it as keyword=value?");
+                            return 0;
+                        } catch (Exception e){
+                            logService.error("Failed to parse argument:" + keyword_val[1]);
+                            return 0;
+                        }
+                    } else {
+                        logService.error("Malformed token: " + a + ".\nDid you remember to format it as keyword=value?");
+                        return 0;
+                    }
 
-        gd.addMessage("------------------------------------------Angles and Distances------------------------------------------------------------------------------------------------------------------------------");
+                    try {
+                        ownColorTable.setLut(defaultLUT);
+                    } catch (Exception e) {
+                        logService.info("Failed to set LUT.\nTrying Default: NCSA PalEdit/6_shades.lut");
+                        try {
+                            ownColorTable.setLut("NCSA PalEdit/6_shades.lut");
+                        } catch (Exception e2) {
+                            logService.info("Failed to set LUT again?.\n");
+                            return 0;
+                        }
 
-        gd.addMessage("If you want to override the calculated values change the values below.\nWill only overwrite values if they are NOT 0.");
+                    }
+                }
+            }
+        } else {
+            GenericDialogPlus gd = new GenericDialogPlus("settings");
 
+            gd.addFileField("CSV input", filePath, 25);
 
-        gd.addNumericField("Start Angle", angRange[0]);
-        gd.addToSameRow();
-        gd.addNumericField("End Angle", angRange[1]);
+            gd.addCheckbox("Save to CSV?", saveSCV);
+            gd.addToSameRow();
+            gd.addDirectoryField("CSV output directory", csv_target_dir, 25);
 
-        gd.addNumericField("Start Distance", distRange[0]);
-        gd.addToSameRow();
-        gd.addNumericField("End Distance", distRange[1]);
+            gd.addMessage("------------------------------------------Angles and Distances------------------------------------------------------------------------------------------------------------------------------");
 
-        gd.addNumericField("Number of Orders", orders);
-
-        gd.addCheckbox("Intensity Order Required?", checkForIntensity);
-        gd.addToSameRow();
-        gd.addMessage("Require that each next order has less intensity than the previous one.");
-
-        gd.addCheckbox("Flip angle?", flipAngles);
-        gd.addToSameRow();
-        gd.addCheckbox("Mirror angle?", mirrorAngles);
-        gd.addToSameRow();
-        gd.addMessage("Sometimes the angle might be calculated 180 degrees off, or mirrored.\n Change these boxes if you get very few or no points.");
-        gd.addCheckbox("Search for angles?", searchAngle);
-        gd.addToSameRow();
-        gd.addMessage("Sometimes the angle is not correctly calculated the first time. With this setting the plugin will search for the correct angle and tell you what settings it used.");
-        gd.addCheckbox("Search for the angle with the most pairs?", deepSearchAngle);
-        gd.addToSameRow();
-        gd.addMessage("Try and find the permutation of above options that results in the most pairs.");
-
-        gd.addMessage("------------------------------------------Filtering------------------------------------------------------------------------------------------------------------------------------");
-
-        gd.addCheckbox("Remove Lone Points", toCleanup);
-        gd.addToSameRow();
-        gd.addNumericField("Required Neightbours", neighbours);
-        gd.addToSameRow();
-        gd.addNumericField("Required Distance", cleanDistance);
-        gd.addMessage("Removes points if there are not at least a number of neighbours in a certain distance.\nWarning: Extremely slow for large datasets");
-
-        gd.addMessage("------------------------------------------Visualisation------------------------------------------------------------------------------------------------------------------------------");
-
-        gd.addCheckbox("Visualise results", visualisation);
-
-        gd.addNumericField("Histogram binwidth", binwidth);
-        String[] colors = ownColorTable.getLuts();
-        Arrays.sort(colors);
+            gd.addMessage("If you want to override the calculated values change the values below.\nWill only overwrite values if they are NOT 0.");
 
 
-        if(runningFromIDE) defaultLUT = "NCSA PalEdit/royal.lut";
-        gd.addChoice("LUT", colors, defaultLUT);
+            gd.addNumericField("Start Angle", angRange[0]);
+            gd.addToSameRow();
+            gd.addNumericField("End Angle", angRange[1]);
 
-        gd.addMessage("Modifies the LUT range of the distances. Will use the calculated distance ranges if not set.");
-        gd.addNumericField("Start LUT", lutRange[0]);
-        gd.addToSameRow();
-        gd.addNumericField("End LUT", lutRange[1]);
+            gd.addNumericField("Start Distance", distRange[0]);
+            gd.addToSameRow();
+            gd.addNumericField("End Distance", distRange[1]);
 
-        gd.showDialog();
+            gd.addNumericField("Number of Orders", orders);
 
-        if (gd.wasCanceled())
-            return 0;
+            gd.addCheckbox("Intensity Order Required?", checkForIntensity);
+            gd.addToSameRow();
+            gd.addNumericField("Ratio between orders:", ratioIntensity);
+            gd.addToSameRow();
+            gd.addMessage("Require that each order has at least (ratio) intensity more than its next order");
 
-        filePath = gd.getNextString();
+            gd.addCheckbox("Flip angle?", flipAngles);
+            gd.addToSameRow();
+            gd.addCheckbox("Mirror angle?", mirrorAngles);
+            gd.addToSameRow();
+            gd.addMessage("Sometimes the angle might be calculated 180 degrees off, or mirrored.\n Change these boxes if you get very few or no points.");
+            gd.addCheckbox("Search for angles?", searchAngle);
+            gd.addToSameRow();
+            gd.addMessage("Sometimes the angle is not correctly calculated the first time. With this setting the plugin will search for the correct angle and tell you what settings it used.");
+            gd.addCheckbox("Search for the angle with the most pairs?", deepSearchAngle);
+            gd.addToSameRow();
+            gd.addMessage("Try and find the permutation of above options that results in the most pairs.");
 
-        saveSCV = gd.getNextBoolean();
-        csv_target_dir = gd.getNextString();
+            gd.addMessage("------------------------------------------Filtering------------------------------------------------------------------------------------------------------------------------------");
 
-        angInput[0] = (float) gd.getNextNumber();
-        angInput[1] = (float) gd.getNextNumber();
+            gd.addCheckbox("Remove Lone Points", toCleanup);
+            gd.addToSameRow();
+            gd.addNumericField("Required Neightbours", neighbours);
+            gd.addToSameRow();
+            gd.addNumericField("Required Distance", cleanDistance);
+            gd.addMessage("Removes points if there are not at least a number of neighbours in a certain distance.\nWarning: Extremely slow for large datasets");
 
-        distInput[0] = (float) gd.getNextNumber();
-        distInput[1] = (float) gd.getNextNumber();
+            gd.addMessage("------------------------------------------Visualisation------------------------------------------------------------------------------------------------------------------------------");
 
-        orders = (int) gd.getNextNumber();
+            gd.addCheckbox("Visualise results", visualisation);
 
-        checkForIntensity = gd.getNextBoolean();
+            gd.addNumericField("Histogram binwidth", binwidth);
+            String[] colors = ownColorTable.getLuts();
+            Arrays.sort(colors);
 
-        flipAngles = gd.getNextBoolean();
-        mirrorAngles = gd.getNextBoolean();
 
-        searchAngle = gd.getNextBoolean();
-        deepSearchAngle = gd.getNextBoolean();
+            if (runningFromIDE) defaultLUT = "NCSA PalEdit/royal.lut";
+            gd.addChoice("LUT", colors, defaultLUT);
 
-        toCleanup = gd.getNextBoolean();
-        neighbours = (int) gd.getNextNumber();
-        cleanDistance = (float) gd.getNextNumber();
+            gd.addMessage("Modifies the LUT range of the distances. Will use the calculated distance ranges if not set.");
+            gd.addNumericField("Start LUT", lutRange[0]);
+            gd.addToSameRow();
+            gd.addNumericField("End LUT", lutRange[1]);
 
-        visualisation = gd.getNextBoolean();
-        binwidth = (float) gd.getNextNumber();
+            gd.showDialog();
 
-        try {
-            defaultLUT = colors[gd.getNextChoiceIndex()];
-            ownColorTable.setLut(defaultLUT);
-        } catch (Exception e){
-            logService.info("Failed to set LUT.\nTrying Default: NCSA PalEdit/6_shades.lut");
-            try {
-                ownColorTable.setLut("NCSA PalEdit/6_shades.lut");
-            } catch (Exception e2) {
+            if (gd.wasCanceled())
                 return 0;
+
+            filePath = gd.getNextString();
+
+            saveSCV = gd.getNextBoolean();
+            csv_target_dir = gd.getNextString();
+
+            angInput[0] = (float) gd.getNextNumber();
+            angInput[1] = (float) gd.getNextNumber();
+
+            distInput[0] = (float) gd.getNextNumber();
+            distInput[1] = (float) gd.getNextNumber();
+
+            orders = (int) gd.getNextNumber();
+
+            checkForIntensity = gd.getNextBoolean();
+            ratioIntensity = (float) gd.getNextNumber();
+
+            flipAngles = gd.getNextBoolean();
+            mirrorAngles = gd.getNextBoolean();
+
+            searchAngle = gd.getNextBoolean();
+            deepSearchAngle = gd.getNextBoolean();
+
+            toCleanup = gd.getNextBoolean();
+            neighbours = (int) gd.getNextNumber();
+            cleanDistance = (float) gd.getNextNumber();
+
+            visualisation = gd.getNextBoolean();
+            binwidth = (float) gd.getNextNumber();
+
+            try {
+                defaultLUT = colors[gd.getNextChoiceIndex()];
+                ownColorTable.setLut(defaultLUT);
+            } catch (Exception e) {
+                logService.info("Failed to set LUT.\nTrying Default: NCSA PalEdit/6_shades.lut");
+                try {
+                    ownColorTable.setLut("NCSA PalEdit/6_shades.lut");
+                } catch (Exception e2) {
+                    return 0;
+                }
+
             }
 
+            lutRange[0] = (float) gd.getNextNumber();
+            lutRange[1] = (float) gd.getNextNumber();
         }
 
-        lutRange[0] = (float) gd.getNextNumber();
-        lutRange[1] = (float) gd.getNextNumber();
+        if(deepSearchAngle) searchAngle = true;
 
         if(filePath.equals("")){
             logService.error("No input CSV was set");
@@ -258,6 +380,11 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
 
         if(saveSCV && csv_target_dir.equals("")){
             logService.error("Set saving to CSV but no filepath was provided.");
+            return 0;
+        }
+
+        if (!(visualisation || saveSCV)) {
+            logService.error("No output method of any sorts is selected.\nSelect either Visualisation or Save to SCV.");
             return 0;
         }
 
@@ -380,23 +507,23 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
                 System.out.println("Total Points: " + (int) floatMatrix.getColumn(revOptionsIndices[0]).max());
 
                 final AtomicInteger ai = new AtomicInteger(0); //Atomic Integer is a thread safe incremental integer
-                final Thread[] threads = createThreadArray(getNbCpus() - 1); //Get maximum of threads
+                final Thread[] threads = createThreadArray(coreCount); //Get maximum of threads
 
-                final FloatMatrix[] intermediateFinals = new FloatMatrix[getNbCpus() - 1];
+                final FloatMatrix[] intermediateFinals = new FloatMatrix[coreCount];
 
                 //Set the run function for each thread
                 for (int ithread = 0; ithread < threads.length; ithread++) {
                     final int finalIthread = ithread;
                     final boolean finalIntensityCheck = checkForIntensity;
+                    final float finalRatioIntensity = ratioIntensity;
                     threads[ithread] = new Thread(() -> {
 
                         intermediateFinals[finalIthread] = new FloatMatrix(0, totalCollumns);
 
                         for (int frame = ai.getAndIncrement(); frame <= frames; frame = ai.getAndIncrement()) {
-                            final int currentAI = ai.get();
-                            if (currentAI % 1000 == 0) logService.info("\r" + currentAI + "/" + frames);
-                            IJ.showProgress(currentAI, frames);
-                            IJ.showStatus(currentAI + "/" + frames);
+                            if (frame % 1000 == 0) logService.info("\r" + frame + "/" + frames);
+                            IJ.showProgress(frame, frames);
+                            IJ.showStatus(frame + "/" + frames);
 
                             final int[] frameIndicices = data.getColumn(0).eq(frame).findIndices();
 
@@ -422,11 +549,11 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
                                     int index = correctAngleAndDistance[i];
                                     if(finalIntensityCheck &&
                                             (frameData.get(index / distances.rows, 3)/
-                                            frameData.get(index % distances.rows, 3)) > ratioIntensity
+                                            frameData.get(index % distances.rows, 3)) > finalRatioIntensity
                                             ) continue;
                                     possibilities.putRow(i, extend(new FloatMatrix(1, orderColumns * 2,
                                             0,                                                  //0
-                                            frame,                                                          //1
+                                            frame,                                                 //1
                                             1 + Math.floorDiv(index, distances.rows),                       //2
                                             frameData.get(index / distances.rows, 1),    //3
                                             frameData.get(index / distances.rows, 2),    //4
@@ -587,6 +714,7 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
                     distRange[0] = distInput[0] == 0f ? distInput[0] : distRange[0];
                     distRange[1] = distInput[1] == 0f ? distInput[1] : distRange[1];
 
+                    runNumber++;
                     run();
 
                 } else {
@@ -618,6 +746,7 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
                         "\tMirror Angle: " + permReference[ind][1] + "\n";
                     if(saveSCV) message += ("CSV files were saved to the folder: " + csv_target_dir + "\n");
 
+                    if(runningFromIDE) System.out.println(message);
                     IJ.showMessage(message);
                 }
 
@@ -630,7 +759,7 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
                     logService.info("Cleaning up data");
 
                     try {
-                        finalPossibilities = cleanup(finalPossibilities, neighbours, cleanDistance);
+                        finalPossibilities = cleanup(finalPossibilities, neighbours, cleanDistance, coreCount);
                     } catch(Exception e){
                         logService.info("Checking for neighbours failed. A retry could work.");
                     }
@@ -774,6 +903,28 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
     public static void main(String[] args) {
         debug = false;
         runningFromIDE = true; //this is really dumb
+
+        /*
+        "csv_in", "csv_out","angle_start", "angle_end",
+        "distance_start", "distance_end",
+        "order_number", "check_order_intensity", "check_order_ratio",
+        "angle_flip", "angle_mirror", "angle_search", "angle_deep_search",
+        "lone_pair_remove", "lone_pair_neighbours", "lone_pair_distance",
+        "visualisation", "hist_binwidth", "LUT", "LUT_start", "LUT_end"
+        */
+
+        //private String csv_target_dir = "C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\results";
+
+        //private String filePath = "F:\\ThesisData\\output\\output3_drift.csv";
+        //private String filePath = "F:\\ThesisData\\output\\combined_drift.csv";
+        //private float[] angRange = new float[] {(float) (-0.03 * Math.PI), (float) (0.07 * Math.PI)};
+        //private float[] distRange = new float[] {1500, 2200};
+
+        //private String filePath = "F:\\ThesisData\\output\\4_grating_drift.csv";
+        //private final float[] angRange = {(float) (-1 * Math.PI), (float) (-0.95 * Math.PI) }; //more than and less than
+        //private final float[] distRange = {1940, 2600}; //1800 3000 (1940, 2240)
+
+        debug_arg_string = "csv_in=F:\\ThesisData\\output\\combined_drift.csv angle_start=-0.094 angle_end=0.22 distance_start=1500 distance_end=2200 visualisation=true";
 
         net.imagej.ImageJ ij = new ImageJ();
         ij.ui().showUI();

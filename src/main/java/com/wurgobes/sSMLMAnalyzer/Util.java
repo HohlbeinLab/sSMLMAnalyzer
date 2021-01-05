@@ -132,14 +132,14 @@ public class Util {
         return title.toString();
     }
 
-    public static FloatMatrix cleanup(final FloatMatrix A, int neighbours, float distance){
+    public static FloatMatrix cleanup(final FloatMatrix A, int neighbours, float distance, int coreCount){
         List<Integer> test = Collections.synchronizedList(new ArrayList<>());
 
         final FloatMatrix X = A.getColumn(3);
         final FloatMatrix Y = A.getColumn(4);
 
         AtomicInteger ai = new AtomicInteger(0);
-        final Thread[] threads = createThreadArray(); //Get maximum of threads
+        final Thread[] threads = createThreadArray(coreCount); //Get maximum of threads
 
         final int rows = A.rows;
         //Set the run function for each thread
@@ -376,13 +376,6 @@ public class Util {
         }
     }
 
-    public static double calcSTD(FloatMatrix A){
-        StandardDeviation std = new StandardDeviation();
-        return std.evaluate(toDouble(A));
-    }
-
-
-
     public static boolean[][] checkForRetry(FloatMatrix A){
         StandardDeviation std = new StandardDeviation();
 
@@ -403,18 +396,6 @@ public class Util {
         int minVal = Collections.min(bins);
         int maxIdx = bins.indexOf(maxVal);
         int minIdx = bins.indexOf(minVal);
-
-        /*
-        System.out.println(lowerbins);
-        System.out.println(upperbins);
-        System.out.println(middlebins);
-        System.out.println(maxVal);
-        System.out.println(minVal);
-        System.out.println(maxIdx);
-        System.out.println(A.rows);
-        System.out.println(std.evaluate(toDouble(bins)));
-        System.out.println(Arrays.toString(bins.toArray()));
-        */
 
         double buffer = 0.2;
 
