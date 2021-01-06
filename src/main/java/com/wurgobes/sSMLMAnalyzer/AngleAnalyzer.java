@@ -56,7 +56,7 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
 
     private final boolean debug;
 
-    public boolean succes = false;
+    private boolean succes = false;
 
     public AngleAnalyzer(FloatMatrix data, boolean flipAngles, boolean mirrorAngles, LogService logService, boolean debug){
         this.data = data;
@@ -264,5 +264,7 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
     public float[] getDistances(){
         return new float[]{Math.round(dist_low), Math.round(dist_high)};
     }
+
+    public boolean getSucces() {return succes;}
 
 }

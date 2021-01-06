@@ -52,9 +52,6 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
     @Parameter
     private LUTService lutService;
 
-    //@Parameter
-    //private OpService opService;
-
     //private final int[] unit_decades = {0, 0, 0, -2, -3, -6, -9, -10, -12, -15};
 
     private final String[] possible_options = {"id", "frame", "x", "y", "z", "intensity", "offset", "bkgstd", "sigma1", "sigma2", "uncertainty", "detections", "chi"};
@@ -124,8 +121,8 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
 
     private static String debug_arg_string = "";
 
-    public int setup() {
-        if (debug || doingRetry) return 1;
+    private boolean setup() {
+        if (debug || doingRetry) return true;
 
         String arg;
 
@@ -224,18 +221,18 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
                                     break;
                                 default:
                                     logService.error("Keyword " + keyword_val[0] + " not found\nDid you mean: " + getTheClosestMatch(keywords, keyword_val[0]) + "?");
-                                    return 0;
+                                    return false;
                             }
                         } catch (ArrayIndexOutOfBoundsException e) {
                             logService.error("Malformed token: " + a + ".\nDid you remember to format it as keyword=value?");
-                            return 0;
+                            return false;
                         } catch (Exception e){
                             logService.error("Failed to parse argument:" + keyword_val[1]);
-                            return 0;
+                            return false;
                         }
                     } else {
                         logService.error("Malformed token: " + a + ".\nDid you remember to format it as keyword=value?");
-                        return 0;
+                        return false;
                     }
 
                     try {
@@ -246,7 +243,7 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
                             ownColorTable.setLut("NCSA PalEdit/6_shades.lut");
                         } catch (Exception e2) {
                             logService.info("Failed to set LUT again?.\n");
-                            return 0;
+                            return false;
                         }
 
                     }
@@ -323,7 +320,7 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
             gd.showDialog();
 
             if (gd.wasCanceled())
-                return 0;
+                return false;
 
             filePath = gd.getNextString();
 
@@ -362,7 +359,7 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
                 try {
                     ownColorTable.setLut("NCSA PalEdit/6_shades.lut");
                 } catch (Exception e2) {
-                    return 0;
+                    return false;
                 }
 
             }
@@ -375,22 +372,22 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
 
         if(filePath.equals("")){
             logService.error("No input CSV was set");
-            return 0;
+            return false;
         }
 
         if(saveSCV && csv_target_dir.equals("")){
             logService.error("Set saving to CSV but no filepath was provided.");
-            return 0;
+            return false;
         }
 
         if (!(visualisation || saveSCV)) {
             logService.error("No output method of any sorts is selected.\nSelect either Visualisation or Save to SCV.");
-            return 0;
+            return false;
         }
 
         totalCollumns = orders * orderColumns;
 
-        return 1;
+        return true;
     }
 
     @Override
@@ -405,7 +402,7 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
             }
         }
 
-        if (setup() != 0) {
+        if (setup()) {
             double csvTime = System.nanoTime();
 
             List<String> collumns = new ArrayList<>();
@@ -496,7 +493,7 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
                     lutRange[1] = distRange[1] == 0f ? distResult[1] : lutRange[1];
 
 
-                    succes = angleAnalyzer.succes;
+                    succes = angleAnalyzer.getSucces();
 
                     if (distRange[0] > distRange[1]) { succes = false; }
                 } else {
@@ -943,14 +940,4 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
         ij.command().run(sSMLMA.class, true);
 
     }
-
 }
-
-class ExecutionFailure extends Exception
-{
-    public ExecutionFailure(String message)
-    {
-        super(message);
-    }
-}
-
