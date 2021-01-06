@@ -395,113 +395,126 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
 
     @Override
     public void run() {
-        try {
-            ownColorTable = new OwnColorTable(lutService);
-            if (doingRetry) {
+
+        ownColorTable = new OwnColorTable(lutService);
+        if (doingRetry) {
+            try {
+                ownColorTable.setLut(defaultLUT);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        if (setup() != 0) {
+            double csvTime = System.nanoTime();
+
+            List<String> collumns = new ArrayList<>();
+
+
+            if (debug) {
+                filePath = csv_target_dir + "\\all_orders.csv";
+                processing = false;
                 try {
-                    ownColorTable.setLut(defaultLUT);
-                } catch (IOException e) {
-                    e.printStackTrace();
+                    System.out.println("Found " + ownColorTable.getLuts().length + " LUTs");
+                    System.out.println(Arrays.toString(ownColorTable.getLuts()));
+                    ownColorTable.setLut("NCSA PalEdit/royal.lut");
+                } catch (Exception e2) {
+                    System.out.println("Failed to set LUT");
+                    System.exit(0);
                 }
+                //flipAngles = true;
+                //mirrorAngles = true;
             }
 
-            if (setup() != 0) {
-                double csvTime = System.nanoTime();
-
-                List<String> collumns = new ArrayList<>();
-
-
-                if (debug) {
-                    filePath = csv_target_dir + "\\all_orders.csv";
-                    processing = false;
-                    try {
-                        System.out.println("Found " + ownColorTable.getLuts().length + " LUTs");
-                        System.out.println(Arrays.toString(ownColorTable.getLuts()));
-                        ownColorTable.setLut("NCSA PalEdit/royal.lut");
-                    } catch (Exception e2) {
-                        System.out.println("Failed to set LUT");
-                        System.exit(0);
-                    }
-                    //flipAngles = true;
-                    //mirrorAngles = true;
+            if (!doingRetry) {
+                try {
+                    floatMatrix = ownFloatMatrix.loadCSVFile(filePath);
+                    collumns = ownFloatMatrix.collumns;
+                } catch (IOException e) {
+                    System.out.println("File not found.");
+                } catch (LapackException e) {
+                    System.out.println("Lapack error");
+                    e.printStackTrace();
+                } catch (Exception e) {
+                    System.out.println("Does the csv start with a header?");
                 }
 
-                if (!doingRetry) {
-                    try {
-                        floatMatrix = ownFloatMatrix.loadCSVFile(filePath);
-                        collumns = ownFloatMatrix.collumns;
-                    } catch (IOException e) {
-                        System.out.println("File not found.");
-                    } catch (LapackException e) {
-                        System.out.println("Lapack error");
-                        e.printStackTrace();
-                    } catch (Exception e) {
-                        System.out.println("Does the csv start with a header?");
+                assert !collumns.isEmpty();
+                assert floatMatrix != null;
+
+                revOptionsIndices = new int[possible_options.length];
+                unitsIndices = new int[collumns.size()];
+
+                Pattern pattern = Pattern.compile("(\\w+)( [ (\\[](\\w+)[)\\] ])?");
+
+                for (int i = 0; i < collumns.size(); i++) {
+                    String header = collumns.get(i);
+                    Matcher matcher = pattern.matcher(header);
+                    if (matcher.find()) {
+                        revOptionsIndices[getTheClosestMatch(possible_options, matcher.group(1))] = i;
+                        unitsIndices[i] = getTheClosestMatch(unit_prefixes, matcher.group(3));
                     }
-
-                    assert !collumns.isEmpty();
-                    assert floatMatrix != null;
-
-                    revOptionsIndices = new int[possible_options.length];
-                    unitsIndices = new int[collumns.size()];
-
-                    Pattern pattern = Pattern.compile("(\\w+)( [ (\\[](\\w+)[)\\] ])?");
-
-                    for (int i = 0; i < collumns.size(); i++) {
-                        String header = collumns.get(i);
-                        Matcher matcher = pattern.matcher(header);
-                        if (matcher.find()) {
-                            revOptionsIndices[getTheClosestMatch(possible_options, matcher.group(1))] = i;
-                            unitsIndices[i] = getTheClosestMatch(unit_prefixes, matcher.group(3));
-                        }
-                    }
-
-                    csvTime = System.nanoTime() - csvTime;
-                    System.out.println("Loading CSV took " + String.format("%.3f", csvTime / 1000000000) + " s");
-
                 }
 
+                csvTime = System.nanoTime() - csvTime;
+                System.out.println("Loading CSV took " + String.format("%.3f", csvTime / 1000000000) + " s");
+
+            }
+
+
+
+
+            double processingTime = System.nanoTime();
+            final FloatMatrix data;
+            FloatMatrix finalPossibilities;
+
+            boolean succes = false;
+
+            if (processing) {
                 if (searchAngle) {
                     System.out.println("Run: " + runNumber + ". Determining Angle with settings: Flip Angle: " + flipAngles + ", Mirror Angle: " + mirrorAngles);
                 }
 
+                //frame, x, y, intensity
+                data = floatMatrix.getColumns(new int[]{revOptionsIndices[1], revOptionsIndices[2], revOptionsIndices[3], revOptionsIndices[5]});
 
-                double processingTime = System.nanoTime();
-                final FloatMatrix data;
-                FloatMatrix finalPossibilities;
-
-
-                if (processing) {
-                    //frame, x, y, intensity
-                    data = floatMatrix.getColumns(new int[]{revOptionsIndices[1], revOptionsIndices[2], revOptionsIndices[3], revOptionsIndices[5]});
-
-                    if (angRange[0] * angRange[1] * distRange[0] * distRange[1] == 0) {
-                        AngleAnalyzer<T> angleAnalyzer = new AngleAnalyzer<>(data, flipAngles, mirrorAngles, logService, debug);
-                        angleAnalyzer.run();
-                        if (!angleAnalyzer.succes) {
-                            logService.error("No features were detected. Are there pairs in this sample?");
-                            throw new ExecutionFailure("No features were detected. Are there pairs in this sample?");
-                        }
-
-                        float[] angResult = angleAnalyzer.getAngles();
-                        float[] distResult = angleAnalyzer.getDistances();
-
-                        angRange[0] = angInput[0] == 0f ? angResult[0] : angInput[0];
-                        angRange[1] = angInput[1] == 0f ? angResult[1] : angInput[1];
-
-                        distRange[0] = distInput[0] == 0f ? distResult[0] : distInput[0];
-                        distRange[1] = distInput[1] == 0f ? distResult[1] : distInput[1];
-
-                        lutRange[0] = distRange[0] == 0f ? distResult[0] : lutRange[0];
-                        lutRange[1] = distRange[1] == 0f ? distResult[1] : lutRange[1];
-
-                        if (distRange[0] > distRange[1]) {
-                            logService.error("The distance had to be positive: " + distRange[0] + " is larger than " + distRange[1]);
-                            throw new ExecutionFailure("The distance had to be positive: " + distRange[0] + " is larger than " + distRange[1]);
-                        }
-                    }
+                if (angRange[0] * angRange[1] * distRange[0] * distRange[1] == 0) {
+                    AngleAnalyzer<T> angleAnalyzer = new AngleAnalyzer<>(data, flipAngles, mirrorAngles, logService, debug);
+                    angleAnalyzer.run();
 
 
+                    float[] angResult = angleAnalyzer.getAngles();
+                    float[] distResult = angleAnalyzer.getDistances();
+
+                    angRange[0] = angInput[0] == 0f ? angResult[0] : angInput[0];
+                    angRange[1] = angInput[1] == 0f ? angResult[1] : angInput[1];
+
+                    distRange[0] = distInput[0] == 0f ? distResult[0] : distInput[0];
+                    distRange[1] = distInput[1] == 0f ? distResult[1] : distInput[1];
+
+                    lutRange[0] = distRange[0] == 0f ? distResult[0] : lutRange[0];
+                    lutRange[1] = distRange[1] == 0f ? distResult[1] : lutRange[1];
+
+
+                    succes = angleAnalyzer.succes;
+
+                    if (distRange[0] > distRange[1]) { succes = false; }
+                } else {
+                    succes = true;
+                }
+            } else {
+                data = floatMatrix;
+            }
+            System.out.println(processing);
+            if (!succes && processing) {
+                if (distRange[0] > distRange[1]) {
+                    logService.error("The distance had to be positive: " + distRange[0] + " is larger than " + distRange[1]);
+                } else {
+                    logService.error("No features were detected. Are there pairs in this sample?");
+                }
+            } else {
+
+                if(processing) {
                     final int frames = (int) data.getColumn(0).max(); //1 indexed
                     // Implement FFT to guess angle and distance
 
@@ -630,7 +643,6 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
                         finalPossibilities = FloatMatrix.concatVertically(finalPossibilities, floatMatrix1);
                     }
 
-
                     //Fix ids
                     int id = 0;
                     for (int i = 0; i < finalPossibilities.rows; i++) {
@@ -639,12 +651,8 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
 
                     processingTime = System.nanoTime() - processingTime;
                     System.out.println("\nProcessing data took " + String.format("%.3f", processingTime / 1000000000) + " s");
-
-
                 } else {
-                    data = floatMatrix;
                     finalPossibilities = floatMatrix;
-
                 }
 
                 assert (finalPossibilities != null);
@@ -899,7 +907,7 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
                 }
             }
         }
-        catch(Exception ignored){ }
+
     }
 
     public static void main(String[] args) {
@@ -926,8 +934,8 @@ public class  sSMLMA < T extends IntegerType<T>> implements Command {
         //private final float[] angRange = {(float) (-1 * Math.PI), (float) (-0.95 * Math.PI) }; //more than and less than
         //private final float[] distRange = {1940, 2600}; //1800 3000 (1940, 2240)
 
-        //debug_arg_string = "csv_in=F:\\ThesisData\\output\\combined_drift.csv angle_start=-0.094 angle_end=0.22 distance_start=1500 distance_end=2200 visualisation=true";
-        debug_arg_string = "csv_in=F:\\ThesisData\\Test3D\\localisations_drift.csv  visualisation=true";
+        debug_arg_string = "csv_in=F:\\ThesisData\\output\\output3_drift.csv angle_start=-0.094 angle_end=0.22 distance_start=1500 distance_end=2200 visualisation=true";
+        //debug_arg_string = "csv_in=F:\\ThesisData\\Test3D\\localisations_drift.csv  visualisation=true";
 
         net.imagej.ImageJ ij = new ImageJ();
         ij.ui().showUI();
