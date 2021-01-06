@@ -37,7 +37,6 @@ import static com.wurgobes.sSMLMAnalyzer.Util.*;
 import static ij.plugin.filter.ParticleAnalyzer.*;
 import static net.imglib2.algorithm.stats.ComputeMinMax.computeMinMax;
 
-@Plugin(type = Command.class, menuPath = "Plugins>Spectral Analyzer>Analyze Angles and Distance")
 public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
 
     private final LogService logService;
