@@ -56,6 +56,8 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
 
     private final boolean debug;
 
+    public boolean succes = false;
+
     public AngleAnalyzer(FloatMatrix data, boolean flipAngles, boolean mirrorAngles, LogService logService, boolean debug){
         this.data = data;
         this.flipAngles = flipAngles;
@@ -237,15 +239,18 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
                 logService.info("Calculating the angle was inaccurate. Angle seems to be: " + realAngle);
         }
 
+        if(distances.size() > 0){
+            succes = true;
+            double buffer = 250;
+
+            dist_low = distances.get(0) * 0.90 - buffer/2;
+            dist_high = distances.get(distances.size() - 1)*1.10 + buffer/2;
+
+            logService.info("Angle: " + angle_low  + "-" + angle_high );
+            logService.info("Distance: " + Math.round(dist_low) + "-" + Math.round(dist_high));
+        }
 
 
-        double buffer = 250;
-
-        dist_low = distances.get(0) * 0.90 - buffer/2;
-        dist_high = distances.get(distances.size() - 1)*1.10 + buffer/2;
-
-        logService.info("Angle: " + angle_low  + "-" + angle_high );
-        logService.info("Distance: " + Math.round(dist_low) + "-" + Math.round(dist_high));
 
 
         processingTime = System.nanoTime() - processingTime;
