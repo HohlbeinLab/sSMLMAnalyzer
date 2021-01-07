@@ -10,6 +10,7 @@ import net.imglib2.util.RealSum;
 
 import org.apache.commons.math3.stat.descriptive.moment.StandardDeviation;
 import org.jblas.FloatMatrix;
+import org.scijava.log.LogService;
 
 import java.io.File;
 import java.io.IOException;
@@ -29,30 +30,34 @@ import static org.jblas.MatrixFunctions.*;
 public class Util {
 
     public static FloatMatrix atan2(FloatMatrix x, FloatMatrix y){
+        // Short helper function for atan2
         return atan2(x, y, Distance(x, y));
     }
 
-    public static FloatMatrix atan2(FloatMatrix x, FloatMatrix y, FloatMatrix intermediate){
+    public static FloatMatrix atan2(final FloatMatrix x, final FloatMatrix y, final FloatMatrix intermediate){
+        // Calculated the four quadrant inverse tangent for the matrix with x and y
         //Very much not a perfect solution
-        //https://en.wikipedia.org/wiki/Atan2
+        // Method taken from https://en.wikipedia.org/wiki/Atan2
         x.assertSameSize(y);
-        FloatMatrix result = new FloatMatrix(x.rows, x.columns);
+        final FloatMatrix result = new FloatMatrix(x.rows, x.columns);
 
-        FloatMatrix domainOne = atan(y.div(intermediate.add(x))).mul(2);
-        //FloatMatrix domainTwo = atan(intermediate.sub(x).div(y)).mul(2);
+        final FloatMatrix domainOne = atan(y.div(intermediate.add(x))).mul(2);
 
         for(int index : x.gt(0).or(y.ne(0)).findIndices()) result.put(index, domainOne.get(index));
-        //for(int index : x.le(0).and(y.ne(0)).findIndices()) result.put(index, domainTwo.get(index));
         for(int index : x.lt(0).and(y.eq(0)).findIndices()) result.put(index, (float) Math.PI);
         for(int i = 0; i < result.rows; i++) result.put(i, i, Float.NaN);
-
 
         return result;
     }
 
-    public static FloatMatrix Distance(FloatMatrix X, FloatMatrix Y){ return sqrt(X.mul(X).addi(Y.mul(Y))); }
+    public static FloatMatrix Distance(final FloatMatrix X, final FloatMatrix Y){
+        // Calculates distance from each point to each other point
+        return sqrt(X.mul(X).addi(Y.mul(Y)));
+    }
 
     public static FloatMatrix makeSubstractedMatrix(FloatMatrix A){
+        // Creates matrix that shows the distance from one value to each other value (including itself)
+
         if(A.columns > 1)
             throw new IllegalArgumentException("Matrix can have only 1 collumn");
 
@@ -67,6 +72,7 @@ public class Util {
         return subtracted;
     }
 
+    // Some functions that create a double array because they're needed for ImageJ functions
     public static double[] toDouble(FloatMatrix A){
         double[] result = new double[A.length];
 
@@ -83,7 +89,8 @@ public class Util {
         return list.stream().mapToDouble(i->i).toArray();
     }
 
-    public static FloatMatrix extend(FloatMatrix A, int rows, int collumns){
+    public static FloatMatrix extend(final FloatMatrix A, int rows, int collumns){
+        // extends a Floatmatrix with 0's to the size provided
         FloatMatrix result = new FloatMatrix(rows, collumns);
         for(int i = 0; i < A.rows; i++){
             for(int j = 0; j < A.columns; j++){
@@ -93,7 +100,8 @@ public class Util {
         return result;
     }
 
-    public static void SaveCSV(FloatMatrix data, List<String> Headers, String CSV_FILE_NAME)  {
+    public static void SaveCSV(final FloatMatrix data, List<String> Headers, String CSV_FILE_NAME)  {
+        // Creates a csv file and writes all the data to it
         File csvOutputFile = new File(CSV_FILE_NAME);
         try (PrintWriter pw = new PrintWriter(csvOutputFile)) {
             pw.println(String.join(",", Headers));
@@ -105,26 +113,30 @@ public class Util {
     }
 
     public static int getBins(FloatMatrix A, float width){
+        // Returns the amount of bins required to get the width desired
         return (int) ((A.max()-A.min())/width);
     }
 
     public static String getOrdinal(int i) {
-        String[] sufixes = new String[] { "th", "st", "nd", "rd", "th", "th", "th", "th", "th", "th" };
+        // Gives you the ordinal associated with the number provided
+        String[] suffixes = new String[] { "th", "st", "nd", "rd", "th", "th", "th", "th", "th", "th" };
         switch (i % 100) {
             case 11:
             case 12:
             case 13:
                 return i + "th";
             default:
-                return i + sufixes[i % 10];
+                return i + suffixes[i % 10];
         }
     }
 
     public static String getTitleHist(int i){
+        // Creates a nicely formatted title for a histogram
         return(getOrdinal(i) + "-" + getOrdinal(i + 1));
     }
 
     public static String getTitlePlot(int orders){
+        // Creates a nicely formatted title for a plot
         StringBuilder title = new StringBuilder();
         for(int i = 0; i < orders; i++){
             title.append(getOrdinal(i)).append("\n");
@@ -133,12 +145,14 @@ public class Util {
     }
 
     public static FloatMatrix cleanup(final FloatMatrix A, int neighbours, float distance, int coreCount){
-        List<Integer> test = Collections.synchronizedList(new ArrayList<>());
+        // Clean up the matrix by discarding any points that do not have at least N neighbours within D distance of them
+
+        final List<Integer> test = Collections.synchronizedList(new ArrayList<>());
 
         final FloatMatrix X = A.getColumn(3);
         final FloatMatrix Y = A.getColumn(4);
 
-        AtomicInteger ai = new AtomicInteger(0);
+        final AtomicInteger ai = new AtomicInteger(0);
         final Thread[] threads = createThreadArray(coreCount); //Get maximum of threads
 
         final int rows = A.rows;
@@ -163,11 +177,13 @@ public class Util {
 
         startAndJoin(threads);
 
-        int[] indices =  test.stream().mapToInt(i->i).toArray();
+        final int[] indices =  test.stream().mapToInt(i->i).toArray();
         return A.getRows(indices);
     }
 
-    public static FloatMatrix connectOrders(FloatMatrix intermediate, int orders, int orderCollumns){
+    public static FloatMatrix connectOrders(final FloatMatrix intermediate, int orders, int orderCollumns){
+        // This function takes all points and tried to connect the different points together for at most N orders.
+        // If more points are found this is echo'd
         boolean checkMoreOrders = true;
         List<Integer> toKeep = new ArrayList<>();
         for(int row = 0; row < intermediate.rows; row ++){
@@ -202,6 +218,9 @@ public class Util {
     }
 
     private static FloatMatrix recursiveSearch(FloatMatrix intermediate, FloatMatrix rowData, int[] connected_indices, int order, int max_order, int orderCollumns) {
+        // Helper function for Connect orders that connects orders by searching for any possible matches and if multiple are found, tries to find the best
+        // This is recursive to find all next orders
+
         //i.e. 12: id, 13: x, 14: y, 15: intensity, 16: distance, 17: angle
         int[] target_range = new int[]{order * orderCollumns, 1 + (order * orderCollumns), 2 + (order * orderCollumns), 3 + (order * orderCollumns), 4 + (order * orderCollumns), 5 + (order * orderCollumns)};
 
@@ -240,7 +259,8 @@ public class Util {
 
     }
 
-    public static int[] FilterbyLength(FloatMatrix A, int orders){
+    public static int[] FilterbyLength(final FloatMatrix A, int orders){
+        // Find if there are any points left in a certain order
         for(int i = orders - 1; i > 1; i--){
             FloatMatrix IdCollumn = A.getColumn(i * 5);
             if(IdCollumn.sum() > 0.0f){
@@ -250,17 +270,22 @@ public class Util {
         return new int[] {0};
     }
 
-    public static int getClosestIndex(FloatMatrix A, float v){
-        FloatMatrix minimised = abs(A.sub(v));
+    public static int getClosestIndex(final FloatMatrix A, float v){
+        // Find the closest index to value v
+        final FloatMatrix minimised = abs(A.sub(v));
         return minimised.eq(minimised.min()).findIndices()[0];
     }
 
-    public static FloatMatrix abs(FloatMatrix A){
+    public static FloatMatrix abs(final FloatMatrix A){
+        // do inplace abs calculation on the matrix
         for(int i = 0; i < A.length; i++) A.put(i, Math.abs(A.get(i)));
         return A;
     }
 
-    public static ImagePlus getImageFromPoints(FloatMatrix A, float[] reduction, int width, int height){
+    public static ImagePlus getImageFromPoints(final FloatMatrix A, float[] reduction, int width, int height){
+        // Creates an imageplus from the Floatmatrix provided for the given height and width
+        // It divides each axis by the value provided since it might be too much otherwise
+        // These values are chosen in such a way it is never too large
         float[] data = new float[width * height];
         float max_intensity = A.getColumn(2).max();
         FloatMatrix intensities = A.getColumn(2).div(max_intensity);
@@ -272,6 +297,7 @@ public class Util {
     }
 
     public static < T extends RealType< T > > double getSum( final Iterable< T > iterable ) {
+        // Sums all values in the iterable
         final RealSum sum = new RealSum();
 
         for ( final T type : iterable )
@@ -281,6 +307,7 @@ public class Util {
     }
 
     public static void addLutLegend(Plot plot, OwnColorTable ct, String label, int width, double start, double end){
+        // Add a LUT legend to the provided plot with the provided start, end and title
         for(int i = 0; i < width; i++){
             plot.setColor(ct.getColor(i, 0, width));
             plot.drawNormalizedLine(0.01 + 0.0005 * (i+2),0.93, 0.01 + 0.0005 * (i+2), 0.99);
@@ -313,6 +340,7 @@ public class Util {
     }
 
     public static long sum(long[] rx) {
+        // long sum
         long sum = 0L;
 
         for (long l : rx) {
@@ -323,6 +351,7 @@ public class Util {
     }
 
     public static int sum(boolean[] rx){
+        // count 'true' items
         int sum = 0;
         for(boolean b : rx){
             sum += b ? 1 : 0;
@@ -330,9 +359,10 @@ public class Util {
         return sum;
     }
 
-    public static int getThresholdBin(float threshold, long[] hist){
+    public static int getThresholdBin(float threshold, final long[] hist){
+        // Get the amount of items that are under the threshold in the histogram
         int bins = hist.length;
-        long elementSum = sum(hist);
+        final long elementSum = sum(hist);
 
         threshold *= elementSum;
 
@@ -346,9 +376,10 @@ public class Util {
     }
 
     public static float[][] sortMultiple(float[] a, float[] b){
+        // Sorts a, and then also sorts b index by index
         float[] tempA = a.clone();
         float[] tempB = new float[b.length];
-        //float[] tempC = new float[c.length];
+
 
         Arrays.sort(tempA);
         reverse(tempA);
@@ -357,7 +388,7 @@ public class Util {
             for(int j = 0; j < a.length; j++){
                 if(a[j]==tempA[i]){
                     tempB[i] = b[j];
-                    //tempC[i] = c[j];
+
                     break;
                 }
             }
@@ -366,7 +397,8 @@ public class Util {
         return new float[][]{tempA, tempB};
     }
 
-    public static void reverse(float[] input) {
+    public static void reverse(final float[] input) {
+        // reverses the array
         int last = input.length - 1;
         int middle = input.length / 2;
         for (int i = 0; i <= middle; i++) {
@@ -377,6 +409,7 @@ public class Util {
     }
 
     public static boolean[][] checkForRetry(FloatMatrix A){
+        // Provide some checks on the list to see fi it had a guassian shape-ish, and if the tailbins contain more values than expected
         StandardDeviation std = new StandardDeviation();
 
         double min = A.min();

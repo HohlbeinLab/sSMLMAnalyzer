@@ -1,6 +1,5 @@
 package com.wurgobes.sSMLMAnalyzer;
 
-
 import fiji.analyze.directionality.Directionality_;
 import ij.*;
 
@@ -26,8 +25,6 @@ import net.imglib2.view.Views;
 import org.jblas.FloatMatrix;
 import org.scijava.command.Command;
 import org.scijava.log.LogService;
-import org.scijava.plugin.Plugin;
-
 
 
 import java.util.ArrayList;

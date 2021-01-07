@@ -14,7 +14,7 @@ public class OwnFloatMatrixLoader {
     static final Pattern COMMA = Pattern.compile(",");
     static final String COMMA_DELIMITER = ",";
 
-    public List<String> collumns = new ArrayList<>();
+    private List<String> collumns = new ArrayList<>();
 
     public FloatMatrix loadCSVFile(String filename) throws IOException {
         BufferedReader is = new BufferedReader(new InputStreamReader(new FileInputStream(filename)));
@@ -63,4 +63,6 @@ public class OwnFloatMatrixLoader {
         }
         return result;
     }
+
+    public List<String> getCollumns() {return collumns;}
 }
