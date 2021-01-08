@@ -1,5 +1,26 @@
 package com.wurgobes.sSMLMAnalyzer;
 
+/*
+Spectral Super Resolution Pair Finder
+(c) 2021 Martijn Gobes, Wageningen University.
+
+This file contains various utility functions used by the other files
+
+This software is released under the GPL v3. You may copy, distribute and modify
+the software as long as you track changes/dates in source files. Any
+modifications to or software including (via compiler) GPL-licensed code
+must also be made available under the GPL along with build & install instructions.
+https://www.gnu.org/licenses/gpl-3.0.en.html
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+ */
+
 import ij.IJ;
 import ij.ImagePlus;
 import ij.gui.Plot;
@@ -10,7 +31,7 @@ import net.imglib2.util.RealSum;
 
 import org.apache.commons.math3.stat.descriptive.moment.StandardDeviation;
 import org.jblas.FloatMatrix;
-import org.scijava.log.LogService;
+
 
 import java.io.File;
 import java.io.IOException;
@@ -219,6 +240,7 @@ public class Util {
 
     private static FloatMatrix recursiveSearch(FloatMatrix intermediate, FloatMatrix rowData, int[] connected_indices, int order, int max_order, int orderCollumns) {
         // Helper function for Connect orders that connects orders by searching for any possible matches and if multiple are found, tries to find the best
+        // Ties are broken by which point has the closest angle to the original pair
         // This is recursive to find all next orders
 
         //i.e. 12: id, 13: x, 14: y, 15: intensity, 16: distance, 17: angle

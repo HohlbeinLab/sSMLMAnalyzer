@@ -1,8 +1,9 @@
 package com.wurgobes.sSMLMAnalyzer;
 
-/* Spectral Super Resolution Pair Finder
+/*
+Spectral Super Resolution Pair Finder
 (c) 2021 Martijn Gobes, Wageningen University.
-Based on the work by ...
+Based on the work by Koen Martens
 
 This plugin works by either going to the menu path: Plugins>Spectral Analyzer>Analyze Pairs
 or by using a macro (example provided in readme.md
@@ -29,6 +30,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
+
 import ij.*;
 import static ij.util.ThreadUtil.*;
 import ij.gui.HistogramWindow;
@@ -65,14 +67,16 @@ import static com.wurgobes.sSMLMAnalyzer.levenshtein.getTheClosestMatch;
 
 @Plugin(type = Command.class, menuPath = "Plugins>Spectral Analyzer>Analyze Pairs")
 
-//TODO
-//custom backup LUT incase imagej cant provide one
-//refactoring:
-//  FloatMatrix to DoubleMatrix
-//  No concating in calculations
+// TODO
+// custom backup LUT incase imagej cant provide one
+// refactoring:
+//   FloatMatrix to DoubleMatrix
+//   No concating in calculations
+// test angle settings 0 to 360?
+// include ZOLA rendering
 
 // T is only used when calling AngleAnalyzer and denotes the type of image created
-public class  sSMLMA <T extends IntegerType<T>> implements Command {
+public class sSMLMA <T extends IntegerType<T>> implements Command {
 
     //The services are passed through from ImageJ automatically
     @Parameter
@@ -80,8 +84,6 @@ public class  sSMLMA <T extends IntegerType<T>> implements Command {
 
     @Parameter
     private LUTService lutService;
-
-
 
     // Variables related to loading the csv (which collumn is what variable)
     private final String[] possible_options = {"id", "frame", "x", "y", "z", "intensity", "offset", "bkgstd", "sigma1", "sigma2", "uncertainty", "detections", "chi"};
@@ -500,7 +502,7 @@ public class  sSMLMA <T extends IntegerType<T>> implements Command {
                 // also catch any errors that might arise
                 try {
                     floatMatrix = ownFloatMatrixLoader.loadCSVFile(filePath);
-                    collumns = ownFloatMatrixLoader.getCollumns();
+                    collumns = ownFloatMatrixLoader.getColumns();
                 } catch (IOException e) {
                     System.out.println("File not found.");
                 } catch (LapackException e) {
@@ -1012,7 +1014,7 @@ public class  sSMLMA <T extends IntegerType<T>> implements Command {
                         // Quick reference to all possible shapes
                         // "line", "connected circle", "filled", "bar", "separated bar", "circle", "box", "triangle", "diamond", "cross", "x", "dot", "error bars" or "xerror bars"
                         String[] colors = {"blue", "red", "green", "black"};
-                        String[] shapes = {"cross", "circle", "box", "diamond"};
+                        String[] shapes = {"dot", "circle", "box", "diamond"};
 
                         //////////////////////////////////////////////
 
