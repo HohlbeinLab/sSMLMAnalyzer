@@ -182,9 +182,8 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
         } else if (std < 0.04) std = 0.04;
 
         // Set the higher and lower end
-        // both get 2 std's
-        angle_high = angle + 2 * std;
-        angle_low = angle - 2 * std;
+        angle_high = angle + 2.5 * std;
+        angle_low = angle - 2.5 * std;
 
         // If either value exceeds Pi, we need to rotate it properly to the other side
         // The angle from atan2() is also calculated in the range [-Pi, Pi)
@@ -272,23 +271,29 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
         // as well as correct it using this check
         ArrayList<Double> angles = new ArrayList<>();
         ArrayList<Double> distances = new ArrayList<>();
+
+        // These cutoff values are chosen empirically
+        // With the FFT these distances can never vary a huge amount
+        // If it turns out someone finds an application where a larger size can occur, one can change these
+        float averageSize = (data.getColumn(1).max() + data.getColumn(2).max())/2;
+        double lowerCutoff = 0.01 * averageSize; // Distances between features is at min 1% of whole size
+        double upperCutoff = 0.1 * averageSize; // Distances between features is at most 10% of whole size
+
         for(int i = 1; i <= peaks; i++){
-            float posX = offsetsX[0] - offsetsX[i];
-            float posY = offsetsY[0] - offsetsY[i];
+            float posX = offsetsX[0] - offsetsX[i]; // delta x to centre
+            float posY = offsetsY[0] - offsetsY[i]; // delta y to centre
 
-
+            // calculate distance to center of feature
             double dist = Math.sqrt(Math.pow(posX * sizeX, 2) + Math.pow(posY * sizeY, 2));
 
-
-            if(dist < 400 | dist > 4000)
-                continue;
-
+            // If the feature is too close or too far, it probably is an error (and would give really wrong results
+            if(dist < lowerCutoff | dist > upperCutoff) continue;
 
             distances.add(dist);
 
             double curAngle = Math.atan2(posY, posX);
             if(debug) System.out.println(curAngle);
-            if(Math.abs(curAngle) > 0.1){
+            if(Math.abs(curAngle) > 0.1){ // Check angle, shouldnt be far from 0
                 angles.add(curAngle);
             }
         }
@@ -312,7 +317,7 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
         // the high end by the last peak
         if(distances.size() > 0){
             succes = true;
-            double buffer = 250;
+            double buffer = 0.0075 * averageSize;
 
             dist_low = distances.get(0) * 0.90 - buffer/2;
             dist_high = distances.get(distances.size() - 1)*1.10 + buffer/2;
@@ -322,13 +327,12 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
         }
 
 
-
-
         processingTime = System.nanoTime() - processingTime;
         System.out.println("Calculating Angles and Distances took " + String.format("%.3f", processingTime / 1000000000) + " s");
     }
 
     public float[] getAngles(){
+        //
         return new float[]{(float) angle_low, (float)  angle_high };
     }
 

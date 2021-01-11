@@ -54,7 +54,7 @@ public class OwnFloatMatrixLoader {
             delimiter = "\t";
         }
 
-        final Pattern DELIMITER_PATTERN  = Pattern.compile(";");
+        final Pattern DELIMITER_PATTERN  = Pattern.compile(delimiter);
         final String DELIMITER = delimiter;
 
         this.columns = Arrays.asList(line.split(DELIMITER));

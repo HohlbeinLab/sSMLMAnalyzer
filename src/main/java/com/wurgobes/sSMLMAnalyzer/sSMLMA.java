@@ -47,8 +47,12 @@ import org.scijava.log.LogService;
 import org.scijava.plugin.Parameter;
 import org.scijava.plugin.Plugin;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -74,6 +78,7 @@ import static com.wurgobes.sSMLMAnalyzer.levenshtein.getTheClosestMatch;
 //   No concating in calculations
 // test angle settings 0 to 360?
 // include ZOLA rendering
+// care about z?
 
 // T is only used when calling AngleAnalyzer and denotes the type of image created
 public class sSMLMA <T extends IntegerType<T>> implements Command {
@@ -156,6 +161,23 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
     private static boolean debug = false;
     private static String debug_arg_string = "";
     private static boolean runningFromIDE = false;
+
+    private static String GetInputStream(InputStream is) {
+        StringBuilder result = new StringBuilder();
+        try (InputStreamReader streamReader =
+                     new InputStreamReader(is, StandardCharsets.UTF_8);
+             BufferedReader reader = new BufferedReader(streamReader)) {
+
+            String line;
+            while ((line = reader.readLine()) != null) {
+                result.append(line);
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return result.toString();
+    }
 
     // Setup() ensures all variables get filled that need filling
     // and throws errors if it doesn't work out
@@ -301,6 +323,9 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                 }
             }
         } else {
+            InputStream is = sSMLMA.class.getResourceAsStream("/Readme.txt"); // OK
+            String content = GetInputStream(is);
+
             // Declare and fill the UI with all options
             GenericDialogPlus gd = new GenericDialogPlus("settings");
             String[] colors = ownColorTable.getLuts();
@@ -369,6 +394,8 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                 gd.addNumericField("Start LUT", lutRange[0]);
                 gd.addToSameRow();
                 gd.addNumericField("End LUT", lutRange[1]);
+
+                gd.addHelp(content);
             }
 
             gd.showDialog();
@@ -504,17 +531,15 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                     floatMatrix = ownFloatMatrixLoader.loadCSVFile(filePath);
                     collumns = ownFloatMatrixLoader.getColumns();
                 } catch (IOException e) {
-                    System.out.println("File not found.");
+                    logService.info("File not found.");
                 } catch (LapackException e) {
-                    System.out.println("Lapack error");
+                    logService.info("Lapack error");
                     e.printStackTrace();
                 } catch (Exception e) {
-                    System.out.println("Error reading file. Does the csv start with a header?");
+                    logService.info("Error reading file. Does the csv start with a header?");
+                    e.printStackTrace();
                 }
 
-                // Double checking theyre not empty/null
-                assert !collumns.isEmpty();
-                assert floatMatrix != null;
 
                 // Initialise the units and header arrays
                 revOptionsIndices = new int[possible_options.length];
@@ -547,13 +572,13 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
             boolean succes = false;
 
 
-            if (processing) {
+            if (processing && floatMatrix != null) {
                 // Echo back settings used when searching for the best angle
                 if (searchAngle) {
                     System.out.println("Run: " + runNumber + ". Determining Angle with settings: Flip Angle: " + flipAngles + ", Mirror Angle: " + mirrorAngles);
                 }
 
-                //frame, x, y, intensity
+                // frame, x, y, intensity
                 // Load the relevant data into
                 data = floatMatrix.getColumns(new int[]{revOptionsIndices[1], revOptionsIndices[2], revOptionsIndices[3], revOptionsIndices[5]});
 
@@ -594,7 +619,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
             }
 
             // If we failed (and are processing) we report the error and stop execution
-            if (!succes && processing) {
+            if ((!succes && processing) | floatMatrix == null){
                 if (distRange[0] > distRange[1]) {
                     logService.error("The distance had to be positive: " + distRange[0] + " is larger than " + distRange[1]);
                 } else {
@@ -777,7 +802,6 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
 
                 // Ensure nothing went wrong and echo back how many points we found
                 // Also clean up some garbage since we are done processing and there are many things we no longer need
-                assert (finalPossibilities != null);
                 System.out.println("Pairs in the 0th-1st order found: " + finalPossibilities.rows);
                 System.gc();
 
@@ -1014,7 +1038,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                         // Quick reference to all possible shapes
                         // "line", "connected circle", "filled", "bar", "separated bar", "circle", "box", "triangle", "diamond", "cross", "x", "dot", "error bars" or "xerror bars"
                         String[] colors = {"blue", "red", "green", "black"};
-                        String[] shapes = {"dot", "circle", "box", "diamond"};
+                        String[] shapes = {"dot", "dot", "dot", "dot"};
 
                         //////////////////////////////////////////////
 
@@ -1117,7 +1141,8 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
         //private final float[] angRange = {(float) (-1 * Math.PI), (float) (-0.95 * Math.PI) }; //more than and less than
         //private final float[] distRange = {1940, 2600}; //1800 3000 (1940, 2240)
 
-        debug_arg_string = "csv_in=F:\\ThesisData\\output\\output3_drift.csv angle_start=-0.094 angle_end=0.22 distance_start=1500 distance_end=2200 visualisation=true";
+        debug_arg_string = "csv_in=F:\\ThesisData\\output\\output3_drift.csv visualisation=true";
+        //debug_arg_string = "csv_in=F:\\ThesisData\\output\\output3_drift.csv angle_start=-0.094 angle_end=0.22 distance_start=1500 distance_end=2200 visualisation=true";
         //debug_arg_string = "csv_in=F:\\ThesisData\\Test3D\\localisations_drift.csv  visualisation=true";
 
         net.imagej.ImageJ ij = new ImageJ();
