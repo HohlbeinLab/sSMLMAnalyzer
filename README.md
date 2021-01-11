@@ -76,3 +76,11 @@ The keywords available are:
 * LUT - The LUT to select
 * LUT_start - LUT start (same unit as distance)
 * LUT_end - LUT end (same unit as distance)
+
+# JBLAS
+
+The Linear Algebra Plugin is large because it has different libraries depending on the platform.  
+I have not tested this fully, but in theory ImageJ on linux should be the fastest version.  
+If JBLAS ever gets updated with improved functionality I will try and integrate this into this plugin.
+
+Developement can be tracked [here](https://github.com/jblas-project/jblas).
