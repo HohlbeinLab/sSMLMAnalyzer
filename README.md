@@ -42,6 +42,7 @@ The start and end settings will calculate any value that is unset(=0).
   
 
 * Visualise Results - Set this to show a variety of graphs and histograms displaying the results
+* Visualise with ZOLA - Set this to include visualisation with ZOLA. The values are prefilled but you need to click OK.
 * Histogram binwidth - Sets the width of the distance histograms bins. This value is calibrated for a sample in nm.
 * LUT - This shows all LUT's available for your ImageJ and allows you to select one
 * LUT start and end - Allows you to display a custom range (same unit as distance) for the LUT visualization
@@ -72,6 +73,7 @@ The keywords available are:
 * lone_pair_neighbours - This will require points to have at least N neighbours within the Required Distance
 * lone_pair_distance -  This sets the distance within which the N neighbours must be found
 * visualisation - Set this to show a variety of graphs and histograms displaying the results
+* visualisationZOLA - Set this to visualise using ZOLA. This does not properly render the 3D version due to issues with ZOLA
 * hist_binwidth - Sets the width of the distance histograms bins. This value is calibrated for a sample in nm.
 * LUT - The LUT to select
 * LUT_start - LUT start (same unit as distance)

@@ -36,7 +36,6 @@ import ij.*;
 import static ij.util.ThreadUtil.*;
 import ij.gui.HistogramWindow;
 import ij.gui.Plot;
-import ij.plugin.PlugIn;
 import ij.process.FloatProcessor;
 
 import net.imagej.ImageJ;
@@ -50,15 +49,7 @@ import org.scijava.plugin.*;
 
 import java.io.*;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
-import java.security.CodeSource;
-import java.security.ProtectionDomain;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -84,7 +75,6 @@ import static com.wurgobes.sSMLMAnalyzer.levenshtein.getTheClosestMatch;
 //   FloatMatrix to DoubleMatrix
 //   No concating in calculations
 // test angle settings 0 to 360?
-// include ZOLA rendering
 // care about z?
 
 // T is only used when calling AngleAnalyzer and denotes the type of image created
