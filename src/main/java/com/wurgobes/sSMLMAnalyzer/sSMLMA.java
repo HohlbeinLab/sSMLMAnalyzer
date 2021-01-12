@@ -97,9 +97,6 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
     @Parameter
     private LUTService lutService;
 
-    @Parameter
-    private PluginService pluginService;
-
     // Variables related to loading the csv (which collumn is what variable)
     private final String[] possible_options = {"id", "frame", "x", "y", "z", "intensity", "offset", "bkgstd", "sigma1", "sigma2", "uncertainty", "detections", "chi"};
     private final String[] unit_prefixes = {"null", "photons", "m", "cm", "mm", "um", "nm", "ang", "pm", "fm"};
@@ -1102,70 +1099,6 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
 
 
                 }
-                if(visualiseZOLA) {
-                    logService.info("ZOLA Visualisation");
-
-                    try {
-                        ExtensionLoader<PlugIn> pluginLoader = new ExtensionLoader<>();
-
-                        String tmpfile;
-                        String directory;
-
-                        if (runningFromIDE) {
-                            System.out.println("Running from IDE has some issues, ignore the errors");
-                            tmpfile = System.getProperty("java.io.tmpdir") + "tmp.csv";
-                            directory = "C:\\Users\\Martijn\\Desktop\\Thesis2020\\ImageJ\\fiji-win64\\Fiji.app\\plugins";
-                            System.setProperty("plugins.dir", "C:\\Users\\Martijn\\Desktop\\Thesis2020\\ImageJ\\fiji-win64\\Fiji.app\\plugins");
-                            Field field = Menus.class.getDeclaredField("pluginsPath");
-                            field.setAccessible(true);
-                            field.set(Menus.class, directory);
-
-                            System.out.println(tmpfile);
-                            if(debug) saveThunderSTORM(tmpfile, floatMatrix);
-                        } else {
-                            tmpfile = IJ.getDirectory("temp") + "tmp.csv";
-                            directory = IJ.getDirectory("plugins");
-                            saveThunderSTORM(tmpfile, finalPossibilities.getColumns(new int[]{0, 1, 3, 4, 5, 10}));
-                        }
-
-
-                        PlugIn zola = pluginLoader.LoadClass(directory, "org.pasteur.imagej.ZOLA", PlugIn.class);
-/*
-
-                        File myFolder = new File(directory);
-
-                        URLClassLoader classLoader = new URLClassLoader(new URL[]{myFolder.toURI().toURL()}, Thread.currentThread().getContextClassLoader());
-
-                        Class<?> stackLocalization_og = Class.forName("org.pasteur.imagej.data.StackLocalization", true, classLoader);
-
-                        Constructor<?> constructor = stackLocalization_og.getConstructor(String.class);
-                        Object instance = constructor.newInstance(tmpfile);
-
-                        Field sl = zola.getClass().getDeclaredField("sl");
-                        sl.setAccessible(true);
-                        sl.set(zola, instance);
-
-                        //Field showLUT = zola.getClass().getDeclaredField("showLUT");
-                        //showLUT.setAccessible(true);
-                        //showLUT.setBoolean(zola, true);
-                         */
-
-                        Prefs.set("Zola.showLUT", true);
-                        Prefs.set("Zola.pathlocalization", tmpfile);
-                        Prefs.set("Zola.is3Drendering", true);
-
-                        zola.run("zola_import");
-
-                        //Prefs.set("Zola.is3Drendering", true);
-                        //Prefs.set("Zola.showLUT", true);
-
-                        //zola.run("zola_hist"); //zola_import, zola_colorHist, zola_hist
-
-                    }  catch (Exception e) {
-                        logService.info("ZOLA integration failed");
-                        e.printStackTrace();
-                    }
-                }
 
                 if (saveSCV) {
                     assert halfOrderMatrix != null;
@@ -1204,6 +1137,38 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                     SaveCSV(halfOrderMatrix, ShortHeader, csv_target_dir + "\\accurate_positions.csv");
                     SaveCSV(finalPossibilities.getColumns(new int[]{0, 1, 3, 4, 5, 10}), ShortHeader, csv_target_dir + "\\thunderSTORM.csv");
                 }
+
+                if(visualiseZOLA) {
+                    logService.info("ZOLA Visualisation");
+
+                    try {
+                        String tmpfile;
+
+                        if (runningFromIDE) {
+                            System.out.println("Running from IDE does not work for ZOLA integration");
+                        } else {
+                            if (saveSCV) {
+                                tmpfile = csv_target_dir + "\\thunderSTORM.csv";
+                            } else {
+                                tmpfile = IJ.getDirectory("temp") + "tmp.csv";
+                                saveThunderSTORM(tmpfile, finalPossibilities.getColumns(new int[]{0, 1, 3, 4, 5, 10}));
+                            }
+
+
+                            Prefs.set("Zola.showLUT", true);
+                            Prefs.set("Zola.pathlocalization", tmpfile);
+                            Prefs.set("Zola.is3Drendering", true);
+
+                            IJ.run("Import table");
+                            IJ.run("2D/3D histogram");
+                        }
+                    }  catch (Exception e) {
+                        logService.info("ZOLA integration failed");
+                        e.printStackTrace();
+                    }
+                }
+
+
             }
         }
     }
