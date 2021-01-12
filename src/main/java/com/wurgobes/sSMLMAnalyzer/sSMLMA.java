@@ -31,10 +31,12 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
 
+
 import ij.*;
 import static ij.util.ThreadUtil.*;
 import ij.gui.HistogramWindow;
 import ij.gui.Plot;
+import ij.plugin.PlugIn;
 import ij.process.FloatProcessor;
 
 import net.imagej.ImageJ;
@@ -44,21 +46,26 @@ import net.imglib2.type.numeric.IntegerType;
 
 import org.scijava.command.Command;
 import org.scijava.log.LogService;
-import org.scijava.plugin.Parameter;
-import org.scijava.plugin.Plugin;
+import org.scijava.plugin.*;
 
-import java.io.BufferedReader;
-import java.io.IOException;
+import java.io.*;
 
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
+import java.security.CodeSource;
+import java.security.ProtectionDomain;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
 
 import fiji.util.gui.GenericDialogPlus;
 
@@ -89,6 +96,9 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
 
     @Parameter
     private LUTService lutService;
+
+    @Parameter
+    private PluginService pluginService;
 
     // Variables related to loading the csv (which collumn is what variable)
     private final String[] possible_options = {"id", "frame", "x", "y", "z", "intensity", "offset", "bkgstd", "sigma1", "sigma2", "uncertainty", "detections", "chi"};
@@ -148,6 +158,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
 
     // Variables related to visualisation
     private boolean visualisation = true;
+    private boolean visualiseZOLA = false;
     private String defaultLUT = "Spectrum.lut";
     private final float[] lutRange = new float[]{0,0};
     private float binwidth = 2.5f; //Binwidth in units used in distance for histograms
@@ -212,7 +223,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                     "order_number", "check_order_intensity", "check_order_ratio",
                     "angle_flip", "angle_mirror", "angle_search", "angle_deep_search",
                     "lone_pair_remove", "lone_pair_neighbours", "lone_pair_distance",
-                    "visualisation", "hist_binwidth", "LUT", "LUT_start", "LUT_end"
+                    "visualisation", "visualisationZOLA", "hist_binwidth", "LUT", "LUT_start", "LUT_end"
             };
             // For each keyword find the right variable and set it
             // if not found, or the value is malformed, throw an error
@@ -261,6 +272,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                                     break;
                                 case "angle_deep_search":
                                     deepSearchAngle = Boolean.parseBoolean(keyword_val[1]);
+                                    if(deepSearchAngle) searchAngle = true;
                                     break;
                                 case "lone_pair_remove":
                                     toCleanup = Boolean.parseBoolean(keyword_val[1]);
@@ -272,22 +284,21 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                                     cleanDistance = Float.parseFloat(keyword_val[1]);
                                     break;
                                 case "visualisation":
-                                    visualisation = true;
+                                    visualisation = Boolean.parseBoolean(keyword_val[1]);
+                                    break;
+                                case "visualisationZOLA":
+                                    visualiseZOLA = Boolean.parseBoolean(keyword_val[1]);
                                     break;
                                 case "hist_binwidth":
-                                    visualisation = true;
                                     binwidth = Float.parseFloat(keyword_val[1]);
                                     break;
                                 case "LUT":
-                                    visualisation = true;
                                     defaultLUT = keyword_val[1];
                                     break;
                                 case "LUT_start":
-                                    visualisation = true;
                                     lutRange[0] = Float.parseFloat(keyword_val[1]);
                                     break;
                                 case "LUT_end":
-                                    visualisation = true;
                                     lutRange[1] = Float.parseFloat(keyword_val[1]);
                                     break;
                                 default:
@@ -381,6 +392,8 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                 gd.addMessage("------------------------------------------Visualisation------------------------------------------------------------------------------------------------------------------------------");
 
                 gd.addCheckbox("Visualise results", visualisation);
+                gd.addToSameRow();
+                gd.addCheckbox("Visualise using ZOLA-3D?", visualiseZOLA);
 
                 gd.addNumericField("Histogram binwidth", binwidth);
 
@@ -433,6 +446,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                 cleanDistance = (float) gd.getNextNumber();
 
                 visualisation = gd.getNextBoolean();
+                visualiseZOLA = gd.getNextBoolean();
                 binwidth = (float) gd.getNextNumber();
 
 
@@ -474,7 +488,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
         }
 
         // Require user to either save or show results
-        if (!(visualisation || saveSCV)) {
+        if (!(visualisation || saveSCV || visualiseZOLA)) {
             logService.error("No output method of any sorts is selected.\nSelect either Visualisation or Save to SCV.");
             return false;
         }
@@ -507,9 +521,11 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
 
             // Debug stuff for skipping calculation and testing visualisation
             if (debug) {
-                filePath = csv_target_dir + "\\all_orders.csv";
+                filePath = "C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\results\\thunderSTORM.csv";
                 processing = false;
-                visualisation = true;
+                visualisation = false;
+                visualiseZOLA = true;
+                saveSCV = false;
                 try {
                     System.out.println("Found " + ownColorTable.getLuts().length + " LUTs");
                     System.out.println(Arrays.toString(ownColorTable.getLuts()));
@@ -625,9 +641,12 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                 } else {
                     logService.error("No features were detected. Are there pairs in this sample?");
                 }
-            } else {
 
-                if(processing) {
+            } else {
+                // Declaring a few vars due to scope juggling
+                FloatMatrix halfOrderMatrix = null;
+                FloatMatrix allOrdersCombined = null;
+                if (processing) {
 
                     final int frames = (int) data.getColumn(0).max(); //Get end frame number
                     final int startFrame = (int) data.getColumn(0).min(); //Get start frame number
@@ -796,329 +815,403 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                     processingTime = System.nanoTime() - processingTime;
                     System.out.println("\nProcessing data took " + String.format("%.3f", processingTime / 1000000000) + " s");
 
-                } else { // If we skip all processing in debug mode we are done
-                    finalPossibilities = floatMatrix;
-                }
 
-                // Ensure nothing went wrong and echo back how many points we found
-                // Also clean up some garbage since we are done processing and there are many things we no longer need
-                System.out.println("Pairs in the 0th-1st order found: " + finalPossibilities.rows);
-                System.gc();
+                    // Ensure nothing went wrong and echo back how many points we found
+                    // Also clean up some garbage since we are done processing and there are many things we no longer need
+                    System.out.println("Pairs in the 0th-1st order found: " + finalPossibilities.rows);
+                    System.gc();
 
-                // If we find very few or no pairs, we echo this back and set the retry flag indicating we should do another attempt
-                // Or tell the user they could enabling searching
-                if (finalPossibilities.rows < 10) {
-                    logService.info("No pairs detected. Try flipping the angle or manually adjusting the distance and angles.");
-                    retry = true;
-                }
-                if (finalPossibilities.rows < 0.1 * data.rows) {
-                    if (searchAngle)
-                        logService.info("Very few pairs were detected.");
-                    else
-                        logService.info("Very few pairs were detected. A search for a better angle could improve results.");
-                    retry = true;
-                }
-
-                // This tells us some information about the angles, like if it has a guassian shape, or if one of the tails is cutoff
-                boolean[][] checks = checkForRetry(finalPossibilities.getColumn(11));
-
-                if (sum(checks[0]) < 2) {
-                    logService.info("Nothing resembling a guassian was found for the angles.");
-                    retry = true;
-                }
-
-                if (checks[1][0]) {
-                    if (checks[1][1])
-                        logService.info("The left tail of the angle histogram seems to be partially cut-off");
-                    else logService.info("The right tail of the angle histogram seems to be partially cut-off");
-                    logService.info("You can take the angle value given and adjust it manually.");
-                }
-
-                // If we are searching for a better angle, save the results and determine if another retry is needed
-                if ((retry && searchAngle) | deepSearchAngle) {
-                    boolean[] curr_perm = new boolean[]{flipAngles, mirrorAngles};
-
-                    // Save our results in the correct position and load the next permutation of variables
-                    for (int i = 0; i < perm.length; i++) {
-                        if (Arrays.equals(perm[i], curr_perm)) {
-                            angleResults[i] = new FloatMatrix();
-                            angleResults[i].copy(finalPossibilities);
-                            perm[i] = null;
-
-                            if (perm[(i + 1) % perm.length] != null) {
-                                flipAngles = perm[(i + 1) % perm.length][0];
-                                mirrorAngles = perm[(i + 1) % perm.length][1];
-                            }
-                            break;
-                        }
+                    // If we find very few or no pairs, we echo this back and set the retry flag indicating we should do another attempt
+                    // Or tell the user they could enabling searching
+                    if (finalPossibilities.rows < 10) {
+                        logService.info("No pairs detected. Try flipping the angle or manually adjusting the distance and angles.");
+                        retry = true;
+                    }
+                    if (finalPossibilities.rows < 0.1 * data.rows) {
+                        if (searchAngle)
+                            logService.info("Very few pairs were detected.");
+                        else
+                            logService.info("Very few pairs were detected. A search for a better angle could improve results.");
+                        retry = true;
                     }
 
-                    // Check if any permutation had not been attempted yet
-                    boolean all_filled = true;
-                    for (FloatMatrix result : angleResults) {
-                        if (result == null) {
-                            all_filled = false;
-                            break;
-                        }
-                    }
-                    // If we haven't done all permutations of settings we arent done yet
-                    if (!all_filled) {
-                        // We reload any user input into the varialbes and do a retry
-                        // This runs run() again
-                        // this is not good, but it was the best solution
-                        // for now
-                        doingRetry = true;
+                    // This tells us some information about the angles, like if it has a guassian shape, or if one of the tails is cutoff
+                    boolean[][] checks = checkForRetry(finalPossibilities.getColumn(11));
 
-                        angRange[0] = angInput[0] == 0f ? angInput[0] : angRange[0];
-                        angRange[1] = angInput[1] == 0f ? angInput[1] : angRange[1];
-
-                        distRange[0] = distInput[0] == 0f ? distInput[0] : distRange[0];
-                        distRange[1] = distInput[1] == 0f ? distInput[1] : distRange[1];
-
-                        runNumber++;
-                        run();
-
-                    } else {
-                        // We are done and load the best results back into out matrix, as well as the best settings
-                        int max = angleResults[0].rows;
-                        int ind = 0;
-                        for (int i = 1; i < angleResults.length; i++) {
-                            if (angleResults[i].rows > max) {
-                                max = angleResults[i].rows;
-                                ind = i;
-                            }
-
-                        }
-                        finalPossibilities = angleResults[ind];
-
-                        angRange[0] = finalPossibilities.getColumn(11).min();
-                        angRange[1] = finalPossibilities.getColumn(11).max();
-
-                        distRange[0] = finalPossibilities.getColumn(10).min();
-                        distRange[1] = finalPossibilities.getColumn(10).max();
-
-                        foundBestResult = true;
-
-                        // Echo back the settings found for this best permutations
-                        String message = "\nBest result was " + max + " pairs found.\n" +
-                                "The following values were found:\n" +
-                                "\tAngle(rad): " + angRange[0] + " to " + angRange[1] + "\n" +
-                                "\tDistance: " + distRange[0] + " to " + distRange[1] + "\n" +
-                                "With the settings:\n" +
-                                "\tFlip Angle: " + permReference[ind][0] + "\n" +
-                                "\tMirror Angle: " + permReference[ind][1] + "\n";
-                        if (saveSCV) message += ("CSV files were saved to the folder: " + csv_target_dir + "\n");
-
-                        if (runningFromIDE) System.out.println(message);
-                        IJ.showMessage(message);
+                    if (sum(checks[0]) < 2) {
+                        logService.info("Nothing resembling a guassian was found for the angles.");
+                        retry = true;
                     }
 
-                }
-                // Anything after this point is skipped if we are not in the final run
-                // So this point is only reached with the best (hopefully) results
-                if ((!(retry && searchAngle) | (foundBestResult && deepSearchAngle)) && displayInfo) {
-                    displayInfo = false; // ensures this path is only ran once
-
-                    // We remove any points with too few neighbours here, if enabled
-                    if (processing && toCleanup) {
-                        IJ.showStatus("Cleaning Data");
-                        logService.info("Cleaning up data");
-
-                        FloatMatrix backup = finalPossibilities.dup();
-
-                        // This sometimes fails and i have not been able to determine why
-                        // A second attempt seems to always works, somehow
-                        try {
-                            finalPossibilities = cleanup(finalPossibilities, neighbours, cleanDistance, coreCount);
-                        } catch (Exception e) {
-                            try {
-                                finalPossibilities = cleanup(finalPossibilities, neighbours, cleanDistance, coreCount);
-                            } catch (Exception e2) {
-                                logService.error("Cleaning up points failed.");
-                                logService.info("Continuing without cleanup.");
-
-                                finalPossibilities = backup; // In case the matrix got corrupted above
-
-                            }
-                        }
+                    if (checks[1][0]) {
+                        if (checks[1][1])
+                            logService.info("The left tail of the angle histogram seems to be partially cut-off");
+                        else logService.info("The right tail of the angle histogram seems to be partially cut-off");
+                        logService.info("You can take the angle value given and adjust it manually.");
                     }
 
+                    // If we are searching for a better angle, save the results and determine if another retry is needed
+                    if ((retry && searchAngle) | deepSearchAngle) {
+                        boolean[] curr_perm = new boolean[]{flipAngles, mirrorAngles};
 
-                    // We have our final data
-                    // but some other versions could give improved information by combining position data from multiple orders into one
-                    // We do this into two ways here
-                    // Once with a only one pair (0th-1st) order
-                    // Another one with all orders combined, as many as there are for one row or data
-                    // It is a lot of code doing some simple combining
-                    //id, frame, x, y, intensity, distance
-                    final FloatMatrix halfOrderMatrix = new FloatMatrix(finalPossibilities.rows, orderColumns);
-                    final FloatMatrix allOrdersCombined = new FloatMatrix(finalPossibilities.rows, orderColumns);
-                    {
+                        // Save our results in the correct position and load the next permutation of variables
+                        for (int i = 0; i < perm.length; i++) {
+                            if (Arrays.equals(perm[i], curr_perm)) {
+                                angleResults[i] = new FloatMatrix();
+                                angleResults[i].copy(finalPossibilities);
+                                perm[i] = null;
 
-
-                        halfOrderMatrix.putColumn(0, finalPossibilities.getColumn(0)); //id
-                        halfOrderMatrix.putColumn(1, finalPossibilities.getColumn(1)); //frame
-                        halfOrderMatrix.putColumn(4, finalPossibilities.getColumn(5)); //intensity
-                        halfOrderMatrix.putColumn(5, finalPossibilities.getColumn(10)); //distance
-
-                        allOrdersCombined.putColumn(0, finalPossibilities.getColumn(0)); //id
-                        allOrdersCombined.putColumn(1, finalPossibilities.getColumn(1)); //frame
-                        allOrdersCombined.putColumn(4, finalPossibilities.getColumn(5)); //intensity
-                        allOrdersCombined.putColumn(5, finalPossibilities.getColumn(10)); //distance
-
-                        halfOrderMatrix.putColumn(2, finalPossibilities.getColumn(3).add(finalPossibilities.getColumn(7)).divi(2.0f)); //x
-                        halfOrderMatrix.putColumn(3, finalPossibilities.getColumn(4).add(finalPossibilities.getColumn(8)).divi(2.0f)); //y
-
-                        FloatMatrix offsets = new FloatMatrix(finalPossibilities.rows, 2);
-                        offsets.putColumn(0, finalPossibilities.getColumn(7).sub(finalPossibilities.getColumn(3)).divi(2.0f));
-                        offsets.putColumn(1, finalPossibilities.getColumn(8).sub(finalPossibilities.getColumn(4)).divi(2.0f));
-
-
-                        for (int i = 0; i < orders - 2; i++) {
-                            FloatMatrix relevantRows = finalPossibilities.getColumn(12 + (i * orderColumns)).ne(0.0f);
-                            offsets.getColumn(0).addi(finalPossibilities.getColumn(13 + (i * orderColumns)).subi(finalPossibilities.getColumn(7 + (i * orderColumns))).divi(2.0f).muli(relevantRows));
-                            offsets.getColumn(1).addi(finalPossibilities.getColumn(14 + (i * orderColumns)).subi(finalPossibilities.getColumn(8 + (i * orderColumns))).divi(2.0f).muli(relevantRows));
-                        }
-
-
-                        allOrdersCombined.putColumn(2, finalPossibilities.getColumn(3));
-                        allOrdersCombined.putColumn(3, finalPossibilities.getColumn(4));
-
-                        FloatMatrix relevantRows = finalPossibilities.getColumn((orders - 1) * orderColumns).ne(0.0f);
-                        for (int i = orders; i > 1; i--) {
-                            allOrdersCombined.getColumn(2).addi(offsets.getColumn(0).divi((float) i).muli(relevantRows));
-                            allOrdersCombined.getColumn(3).addi(offsets.getColumn(1).divi((float) i).muli(relevantRows));
-
-                            relevantRows.xori(finalPossibilities.getColumn((i - 2) * orderColumns).ne(0.0f));
-                        }
-                    }
-
-                    if (visualisation) {
-
-                        HistogramWindow[] histograms = new HistogramWindow[orders - 1]; // We create some histograms for each distance order we want to visualise
-
-                        // For each order we fill the distance into each matrix
-                        // this allows one to compare the distances for each order
-                        // they should be the same for each order to order, but its still useful
-                        for (int i = 0; i < orders - 1; i++) {
-                            FloatMatrix relevantData;
-
-                            // Visualise either every row or only the rows that have data in it
-                            // Since not each row might have data for each order
-                            if (i == 0) {
-                                relevantData = finalPossibilities.getColumn(10);
-                            } else {
-                                relevantData = finalPossibilities.getColumn(10 + (i * orderColumns));
-                                relevantData = relevantData.get(relevantData.ne(0.0f).findIndices());
-                            }
-
-                            System.out.println("Found " + relevantData.rows + " connections in the " + getTitleHist(i) + " order");
-
-                            // If there are few points, the graph is useless and we do not display it and do not visualise more orders than this
-                            if (relevantData.rows < 50) {
-                                orders = i + 1;
+                                if (perm[(i + 1) % perm.length] != null) {
+                                    flipAngles = perm[(i + 1) % perm.length][0];
+                                    mirrorAngles = perm[(i + 1) % perm.length][1];
+                                }
                                 break;
                             }
-                            // Create an image from the matrix, and then use that to make a histogram
-                            // Thanks ImageJ
-                            ImagePlus dummy = new ImagePlus("", new FloatProcessor(relevantData.toArray2()));
-                            histograms[i] = new HistogramWindow(getTitleHist(i), dummy, getBins(relevantData, binwidth), distRange[0], distRange[1]);
-                            if (runningFromIDE) histograms[i].getImagePlus().show();
-                        }
-                        ///////////////// Angles
-
-                        // Take all the angles for the first pair, create an image and display it
-                        // width of bins is hardcoded to 0.005 rad
-                        ImagePlus Angles = new ImagePlus("", new FloatProcessor(finalPossibilities.getColumn(11).toArray2()));
-                        HistogramWindow angleHist = new HistogramWindow("Angles", Angles, getBins(finalPossibilities.getColumn(11), 0.005f), angRange[0], angRange[1]);
-                        if (runningFromIDE) angleHist.getImagePlus().show();
-
-                        ///////////////////////////////////////////////////////////// PLOTS
-                        // Arrays for the colors and shapes used for each order
-                        // Quick reference to all possible shapes
-                        // "line", "connected circle", "filled", "bar", "separated bar", "circle", "box", "triangle", "diamond", "cross", "x", "dot", "error bars" or "xerror bars"
-                        String[] colors = {"blue", "red", "green", "black"};
-                        String[] shapes = {"dot", "dot", "dot", "dot"};
-
-                        //////////////////////////////////////////////
-
-                        // This plot displays the x and y for all found points
-                        Plot orderPlot = new Plot("Orders", "x [" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "]", "y [" + unit_prefixes[unitsIndices[revOptionsIndices[3]]] + "]");
-
-
-                        // Set the color and add the first order (and then all other orders in the for loop)
-                        orderPlot.setColor(colors[0]);
-                        orderPlot.add(shapes[0], toDouble(finalPossibilities.getColumn(3)), toDouble(finalPossibilities.getColumn(4)));
-                        for (int i = 1; i < orders; i++) {
-                            orderPlot.setColor(colors[i]);
-                            orderPlot.add(shapes[i], toDouble(finalPossibilities.getColumn(1 + (i * orderColumns))), toDouble(finalPossibilities.getColumn(2 + (i * orderColumns))));
                         }
 
-                        orderPlot.setLegend(getTitlePlot(orders), Plot.AUTO_POSITION); // Set the legend and its position
-                        orderPlot.show();
-                        //////////////////////////////////////////////
-
-                        // Show a Plot with only the combined position for each row, reducing the amounts of points
-                        // The color of each point is the distance between the 0th and 1st order, based on the selected LUT
-
-                        Plot distancePlot = new Plot("Distance", "x [" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "]", "y [" + unit_prefixes[unitsIndices[revOptionsIndices[3]]] + "]");
-
-                        for (int i = 0; i < finalPossibilities.rows; i++) {
-                            distancePlot.setColor(ownColorTable.getColor(allOrdersCombined.get(i, 5), distRange[0], distRange[1]));
-
-                            distancePlot.add(shapes[0], toDouble(halfOrderMatrix.get(i, 2)), toDouble(halfOrderMatrix.get(i, 3))); // 3 4
-                        }
-
-                        distancePlot.setLimitsToFit(true); // Ensure all points are visible
-                        addLutLegend(distancePlot, ownColorTable, "Distance", 512, distRange[0], distRange[1]); // Add the LUT as a legend
-                        distancePlot.show();
-                        distancePlot.setLimits(Float.NaN, Float.NaN, Float.NaN, Float.NaN); // Ensure all points are visible, again
-
-                    }
-
-                    if (saveSCV) {
-                        //Create Header
-                        // Longheader for all the data
-                        // Shortheader when tis just one position
-                        List<String> LongHeader = new ArrayList<>();
-                        List<String> ShortHeader = new ArrayList<>();
-                        LongHeader.add("id");
-                        ShortHeader.add("id");
-                        LongHeader.add("frame");
-                        ShortHeader.add("frame");
-
-                        // Pre-create the distance unit for the distance
-                        String distanceUnit = (unit_prefixes[unitsIndices[revOptionsIndices[2]]].equals(unit_prefixes[unitsIndices[revOptionsIndices[3]]]) ? unit_prefixes[unitsIndices[revOptionsIndices[2]]] : ("(" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "*" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + ")^½"));
-                        // Add the headers for each order
-                        for (int i = 0; i < orders; i++) {
-                            LongHeader.add("index " + i);
-                            LongHeader.add("x [" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "] " + i);
-                            LongHeader.add("y [" + unit_prefixes[unitsIndices[revOptionsIndices[3]]] + "] " + i);
-                            LongHeader.add("intensity [" + unit_prefixes[unitsIndices[revOptionsIndices[5]]] + "] " + i);
-                            if (i > 0) {
-                                LongHeader.add((i - 1) + "-" + i + " distance [" + distanceUnit + "]");
-                                LongHeader.add((i - 1) + "-" + i + "angle");
+                        // Check if any permutation had not been attempted yet
+                        boolean all_filled = true;
+                        for (FloatMatrix result : angleResults) {
+                            if (result == null) {
+                                all_filled = false;
+                                break;
                             }
                         }
-                        // Only add one header level to the short ones
-                        ShortHeader.add("x [" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "]");
-                        ShortHeader.add("y [" + unit_prefixes[unitsIndices[revOptionsIndices[3]]] + "]");
-                        ShortHeader.add("intensity [" + unit_prefixes[unitsIndices[revOptionsIndices[5]]] + "]");
-                        ShortHeader.add("z [" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "]");
+                        // If we haven't done all permutations of settings we arent done yet
+                        if (!all_filled) {
+                            // We reload any user input into the varialbes and do a retry
+                            // This runs run() again
+                            // this is not good, but it was the best solution
+                            // for now
+                            doingRetry = true;
 
-                        // Save all data using the proper header, including one that easily is loaded into ThunderSTORM again for visualisation etc
-                        SaveCSV(finalPossibilities, LongHeader, csv_target_dir + "\\all_orders.csv");
-                        SaveCSV(halfOrderMatrix, ShortHeader, csv_target_dir + "\\accurate_positions.csv");
-                        SaveCSV(finalPossibilities.getColumns(new int[]{0, 1, 3, 4, 5, 10}), ShortHeader, csv_target_dir + "\\thunderSTORM.csv");
+                            angRange[0] = angInput[0] == 0f ? angInput[0] : angRange[0];
+                            angRange[1] = angInput[1] == 0f ? angInput[1] : angRange[1];
+
+                            distRange[0] = distInput[0] == 0f ? distInput[0] : distRange[0];
+                            distRange[1] = distInput[1] == 0f ? distInput[1] : distRange[1];
+
+                            runNumber++;
+                            run();
+
+                        } else {
+                            // We are done and load the best results back into out matrix, as well as the best settings
+                            int max = angleResults[0].rows;
+                            int ind = 0;
+                            for (int i = 1; i < angleResults.length; i++) {
+                                if (angleResults[i].rows > max) {
+                                    max = angleResults[i].rows;
+                                    ind = i;
+                                }
+
+                            }
+                            finalPossibilities = angleResults[ind];
+
+                            angRange[0] = finalPossibilities.getColumn(11).min();
+                            angRange[1] = finalPossibilities.getColumn(11).max();
+
+                            distRange[0] = finalPossibilities.getColumn(10).min();
+                            distRange[1] = finalPossibilities.getColumn(10).max();
+
+                            foundBestResult = true;
+
+                            // Echo back the settings found for this best permutations
+                            String message = "\nBest result was " + max + " pairs found.\n" +
+                                    "The following values were found:\n" +
+                                    "\tAngle(rad): " + angRange[0] + " to " + angRange[1] + "\n" +
+                                    "\tDistance: " + distRange[0] + " to " + distRange[1] + "\n" +
+                                    "With the settings:\n" +
+                                    "\tFlip Angle: " + permReference[ind][0] + "\n" +
+                                    "\tMirror Angle: " + permReference[ind][1] + "\n";
+                            if (saveSCV) message += ("CSV files were saved to the folder: " + csv_target_dir + "\n");
+
+                            if (runningFromIDE) System.out.println(message);
+                            IJ.showMessage(message);
+                        }
+
                     }
+
+
+                    // Anything after this point is skipped if we are not in the final run
+                    // So this point is only reached with the best (hopefully) results
+                    if ((!(retry && searchAngle) | (foundBestResult && deepSearchAngle)) && displayInfo) {
+                        displayInfo = false; // ensures this path is only ran once
+
+                        // We remove any points with too few neighbours here, if enabled
+                        if (processing && toCleanup) {
+                            IJ.showStatus("Cleaning Data");
+                            logService.info("Cleaning up data");
+
+                            FloatMatrix backup = finalPossibilities.dup();
+
+                            // This sometimes fails and i have not been able to determine why
+                            // A second attempt seems to always works, somehow
+                            try {
+                                finalPossibilities = cleanup(finalPossibilities, neighbours, cleanDistance, coreCount);
+                            } catch (Exception e) {
+                                try {
+                                    finalPossibilities = cleanup(finalPossibilities, neighbours, cleanDistance, coreCount);
+                                } catch (Exception e2) {
+                                    logService.error("Cleaning up points failed.");
+                                    logService.info("Continuing without cleanup.");
+
+                                    finalPossibilities = backup; // In case the matrix got corrupted above
+
+                                }
+                            }
+                        }
+
+
+                        // We have our final data
+                        // but some other versions could give improved information by combining position data from multiple orders into one
+                        // We do this into two ways here
+                        // Once with a only one pair (0th-1st) order
+                        // Another one with all orders combined, as many as there are for one row or data
+                        // It is a lot of code doing some simple combining
+                        //id, frame, x, y, intensity, distance
+                        halfOrderMatrix = new FloatMatrix(finalPossibilities.rows, orderColumns);
+                        allOrdersCombined = new FloatMatrix(finalPossibilities.rows, orderColumns);
+                        {
+
+
+                            halfOrderMatrix.putColumn(0, finalPossibilities.getColumn(0)); //id
+                            halfOrderMatrix.putColumn(1, finalPossibilities.getColumn(1)); //frame
+                            halfOrderMatrix.putColumn(4, finalPossibilities.getColumn(5)); //intensity
+                            halfOrderMatrix.putColumn(5, finalPossibilities.getColumn(10)); //distance
+
+                            allOrdersCombined.putColumn(0, finalPossibilities.getColumn(0)); //id
+                            allOrdersCombined.putColumn(1, finalPossibilities.getColumn(1)); //frame
+                            allOrdersCombined.putColumn(4, finalPossibilities.getColumn(5)); //intensity
+                            allOrdersCombined.putColumn(5, finalPossibilities.getColumn(10)); //distance
+
+                            halfOrderMatrix.putColumn(2, finalPossibilities.getColumn(3).add(finalPossibilities.getColumn(7)).divi(2.0f)); //x
+                            halfOrderMatrix.putColumn(3, finalPossibilities.getColumn(4).add(finalPossibilities.getColumn(8)).divi(2.0f)); //y
+
+                            FloatMatrix offsets = new FloatMatrix(finalPossibilities.rows, 2);
+                            offsets.putColumn(0, finalPossibilities.getColumn(7).sub(finalPossibilities.getColumn(3)).divi(2.0f));
+                            offsets.putColumn(1, finalPossibilities.getColumn(8).sub(finalPossibilities.getColumn(4)).divi(2.0f));
+
+
+                            for (int i = 0; i < orders - 2; i++) {
+                                FloatMatrix relevantRows = finalPossibilities.getColumn(12 + (i * orderColumns)).ne(0.0f);
+                                offsets.getColumn(0).addi(finalPossibilities.getColumn(13 + (i * orderColumns)).subi(finalPossibilities.getColumn(7 + (i * orderColumns))).divi(2.0f).muli(relevantRows));
+                                offsets.getColumn(1).addi(finalPossibilities.getColumn(14 + (i * orderColumns)).subi(finalPossibilities.getColumn(8 + (i * orderColumns))).divi(2.0f).muli(relevantRows));
+                            }
+
+
+                            allOrdersCombined.putColumn(2, finalPossibilities.getColumn(3));
+                            allOrdersCombined.putColumn(3, finalPossibilities.getColumn(4));
+
+                            FloatMatrix relevantRows = finalPossibilities.getColumn((orders - 1) * orderColumns).ne(0.0f);
+                            for (int i = orders; i > 1; i--) {
+                                allOrdersCombined.getColumn(2).addi(offsets.getColumn(0).divi((float) i).muli(relevantRows));
+                                allOrdersCombined.getColumn(3).addi(offsets.getColumn(1).divi((float) i).muli(relevantRows));
+
+                                relevantRows.xori(finalPossibilities.getColumn((i - 2) * orderColumns).ne(0.0f));
+                            }
+                        }
+                    }
+                } else { // If we skip all processing in debug mode we are done
+                    finalPossibilities = floatMatrix;
+                    halfOrderMatrix = floatMatrix;
+                    allOrdersCombined = floatMatrix;
+                }
+                if (visualisation) {
+                    assert allOrdersCombined != null;
+
+                    HistogramWindow[] histograms = new HistogramWindow[orders - 1]; // We create some histograms for each distance order we want to visualise
+
+                    // For each order we fill the distance into each matrix
+                    // this allows one to compare the distances for each order
+                    // they should be the same for each order to order, but its still useful
+                    for (int i = 0; i < orders - 1; i++) {
+                        FloatMatrix relevantData;
+
+                        // Visualise either every row or only the rows that have data in it
+                        // Since not each row might have data for each order
+                        if (i == 0) {
+                            relevantData = finalPossibilities.getColumn(10);
+                        } else {
+                            relevantData = finalPossibilities.getColumn(10 + (i * orderColumns));
+                            relevantData = relevantData.get(relevantData.ne(0.0f).findIndices());
+                        }
+
+                        System.out.println("Found " + relevantData.rows + " connections in the " + getTitleHist(i) + " order");
+
+                        // If there are few points, the graph is useless and we do not display it and do not visualise more orders than this
+                        if (relevantData.rows < 50) {
+                            orders = i + 1;
+                            break;
+                        }
+                        // Create an image from the matrix, and then use that to make a histogram
+                        // Thanks ImageJ
+                        ImagePlus dummy = new ImagePlus("", new FloatProcessor(relevantData.toArray2()));
+                        histograms[i] = new HistogramWindow(getTitleHist(i), dummy, getBins(relevantData, binwidth), distRange[0], distRange[1]);
+                        if (runningFromIDE) histograms[i].getImagePlus().show();
+                    }
+                    ///////////////// Angles
+
+                    // Take all the angles for the first pair, create an image and display it
+                    // width of bins is hardcoded to 0.005 rad
+                    ImagePlus Angles = new ImagePlus("", new FloatProcessor(finalPossibilities.getColumn(11).toArray2()));
+                    HistogramWindow angleHist = new HistogramWindow("Angles", Angles, getBins(finalPossibilities.getColumn(11), 0.005f), angRange[0], angRange[1]);
+                    if (runningFromIDE) angleHist.getImagePlus().show();
+
+                    ///////////////////////////////////////////////////////////// PLOTS
+                    // Arrays for the colors and shapes used for each order
+                    // Quick reference to all possible shapes
+                    // "line", "connected circle", "filled", "bar", "separated bar", "circle", "box", "triangle", "diamond", "cross", "x", "dot", "error bars" or "xerror bars"
+                    String[] colors = {"blue", "red", "green", "black"};
+                    String[] shapes = {"dot", "dot", "dot", "dot"};
+
+                    //////////////////////////////////////////////
+
+                    // This plot displays the x and y for all found points
+                    Plot orderPlot = new Plot("Orders", "x [" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "]", "y [" + unit_prefixes[unitsIndices[revOptionsIndices[3]]] + "]");
+
+
+                    // Set the color and add the first order (and then all other orders in the for loop)
+                    orderPlot.setColor(colors[0]);
+                    orderPlot.add(shapes[0], toDouble(finalPossibilities.getColumn(3)), toDouble(finalPossibilities.getColumn(4)));
+                    for (int i = 1; i < orders; i++) {
+                        orderPlot.setColor(colors[i]);
+                        orderPlot.add(shapes[i], toDouble(finalPossibilities.getColumn(1 + (i * orderColumns))), toDouble(finalPossibilities.getColumn(2 + (i * orderColumns))));
+                    }
+
+                    orderPlot.setLegend(getTitlePlot(orders), Plot.AUTO_POSITION); // Set the legend and its position
+                    orderPlot.show();
+                    //////////////////////////////////////////////
+
+                    // Show a Plot with only the combined position for each row, reducing the amounts of points
+                    // The color of each point is the distance between the 0th and 1st order, based on the selected LUT
+
+                    Plot distancePlot = new Plot("Distance", "x [" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "]", "y [" + unit_prefixes[unitsIndices[revOptionsIndices[3]]] + "]");
+
+                    for (int i = 0; i < finalPossibilities.rows; i++) {
+
+                        distancePlot.setColor(ownColorTable.getColor(allOrdersCombined.get(i, 5), distRange[0], distRange[1]));
+
+                        distancePlot.add(shapes[0], toDouble(halfOrderMatrix.get(i, 2)), toDouble(halfOrderMatrix.get(i, 3))); // 3 4
+                    }
+
+                    distancePlot.setLimitsToFit(true); // Ensure all points are visible
+                    addLutLegend(distancePlot, ownColorTable, "Distance", 512, distRange[0], distRange[1]); // Add the LUT as a legend
+                    distancePlot.show();
+                    distancePlot.setLimits(Float.NaN, Float.NaN, Float.NaN, Float.NaN); // Ensure all points are visible, again
+
+
+
+                }
+                if(visualiseZOLA) {
+                    logService.info("ZOLA Visualisation");
+
+                    try {
+                        ExtensionLoader<PlugIn> pluginLoader = new ExtensionLoader<>();
+
+                        String tmpfile;
+                        String directory;
+
+                        if (runningFromIDE) {
+                            System.out.println("Running from IDE has some issues, ignore the errors");
+                            tmpfile = System.getProperty("java.io.tmpdir") + "tmp.csv";
+                            directory = "C:\\Users\\Martijn\\Desktop\\Thesis2020\\ImageJ\\fiji-win64\\Fiji.app\\plugins";
+                            System.setProperty("plugins.dir", "C:\\Users\\Martijn\\Desktop\\Thesis2020\\ImageJ\\fiji-win64\\Fiji.app\\plugins");
+                            Field field = Menus.class.getDeclaredField("pluginsPath");
+                            field.setAccessible(true);
+                            field.set(Menus.class, directory);
+
+                            System.out.println(tmpfile);
+                            if(debug) saveThunderSTORM(tmpfile, floatMatrix);
+                        } else {
+                            tmpfile = IJ.getDirectory("temp") + "tmp.csv";
+                            directory = IJ.getDirectory("plugins");
+                            saveThunderSTORM(tmpfile, finalPossibilities.getColumns(new int[]{0, 1, 3, 4, 5, 10}));
+                        }
+
+
+                        PlugIn zola = pluginLoader.LoadClass(directory, "org.pasteur.imagej.ZOLA", PlugIn.class);
+/*
+
+                        File myFolder = new File(directory);
+
+                        URLClassLoader classLoader = new URLClassLoader(new URL[]{myFolder.toURI().toURL()}, Thread.currentThread().getContextClassLoader());
+
+                        Class<?> stackLocalization_og = Class.forName("org.pasteur.imagej.data.StackLocalization", true, classLoader);
+
+                        Constructor<?> constructor = stackLocalization_og.getConstructor(String.class);
+                        Object instance = constructor.newInstance(tmpfile);
+
+                        Field sl = zola.getClass().getDeclaredField("sl");
+                        sl.setAccessible(true);
+                        sl.set(zola, instance);
+
+                        //Field showLUT = zola.getClass().getDeclaredField("showLUT");
+                        //showLUT.setAccessible(true);
+                        //showLUT.setBoolean(zola, true);
+                         */
+
+                        Prefs.set("Zola.showLUT", true);
+                        Prefs.set("Zola.pathlocalization", tmpfile);
+                        Prefs.set("Zola.is3Drendering", true);
+
+                        zola.run("zola_import");
+
+                        //Prefs.set("Zola.is3Drendering", true);
+                        //Prefs.set("Zola.showLUT", true);
+
+                        //zola.run("zola_hist"); //zola_import, zola_colorHist, zola_hist
+
+                    }  catch (Exception e) {
+                        logService.info("ZOLA integration failed");
+                        e.printStackTrace();
+                    }
+                }
+
+                if (saveSCV) {
+                    assert halfOrderMatrix != null;
+                    //Create Header
+                    // Longheader for all the data
+                    // Shortheader when tis just one position
+                    List<String> LongHeader = new ArrayList<>();
+                    List<String> ShortHeader = new ArrayList<>();
+                    LongHeader.add("id");
+                    ShortHeader.add("id");
+                    LongHeader.add("frame");
+                    ShortHeader.add("frame");
+
+                    // Pre-create the distance unit for the distance
+                    String distanceUnit = (unit_prefixes[unitsIndices[revOptionsIndices[2]]].equals(unit_prefixes[unitsIndices[revOptionsIndices[3]]]) ? unit_prefixes[unitsIndices[revOptionsIndices[2]]] : ("(" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "*" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + ")^½"));
+                    // Add the headers for each order
+                    for (int i = 0; i < orders; i++) {
+                        LongHeader.add("index " + i);
+                        LongHeader.add("x [" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "] " + i);
+                        LongHeader.add("y [" + unit_prefixes[unitsIndices[revOptionsIndices[3]]] + "] " + i);
+                        LongHeader.add("intensity [" + unit_prefixes[unitsIndices[revOptionsIndices[5]]] + "] " + i);
+                        if (i > 0) {
+                            LongHeader.add((i - 1) + "-" + i + " distance [" + distanceUnit + "]");
+                            LongHeader.add((i - 1) + "-" + i + "angle");
+                        }
+                    }
+                    // Only add one header level to the short ones
+                    ShortHeader.add("x [" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "]");
+                    ShortHeader.add("y [" + unit_prefixes[unitsIndices[revOptionsIndices[3]]] + "]");
+                    ShortHeader.add("intensity [" + unit_prefixes[unitsIndices[revOptionsIndices[5]]] + "]");
+                    ShortHeader.add("z [" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "]");
+
+                    // Save all data using the proper header, including one that easily is loaded into ThunderSTORM again for visualisation etc
+                    SaveCSV(finalPossibilities, LongHeader, csv_target_dir + "\\all_orders.csv");
+
+                    SaveCSV(halfOrderMatrix, ShortHeader, csv_target_dir + "\\accurate_positions.csv");
+                    SaveCSV(finalPossibilities.getColumns(new int[]{0, 1, 3, 4, 5, 10}), ShortHeader, csv_target_dir + "\\thunderSTORM.csv");
                 }
             }
         }
     }
 
+
     // Only run from the IDE
     public static void main(String[] args) {
-        debug = false;
+        debug = true;
         runningFromIDE = true; //this is really dumb
 
         /*
@@ -1141,8 +1234,8 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
         //private final float[] angRange = {(float) (-1 * Math.PI), (float) (-0.95 * Math.PI) }; //more than and less than
         //private final float[] distRange = {1940, 2600}; //1800 3000 (1940, 2240)
 
-        debug_arg_string = "csv_in=F:\\ThesisData\\output\\output3_drift.csv visualisation=true";
-        //debug_arg_string = "csv_in=F:\\ThesisData\\output\\output3_drift.csv angle_start=-0.094 angle_end=0.22 distance_start=1500 distance_end=2200 visualisation=true";
+        //debug_arg_string = "csv_in=F:\\ThesisData\\output\\output3_drift.csv  visualisation=true";
+        debug_arg_string = "csv_in=F:\\ThesisData\\output\\output3_drift.csv angle_start=-0.094 angle_end=0.22 distance_start=1500 distance_end=2200 visualisation=true";
         //debug_arg_string = "csv_in=F:\\ThesisData\\Test3D\\localisations_drift.csv  visualisation=true";
 
         net.imagej.ImageJ ij = new ImageJ();

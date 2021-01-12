@@ -456,4 +456,23 @@ public class Util {
 
         return new boolean[][] {{(std.evaluate(toDouble(bins)) / A.rows) > 0.05, minIdx < bins.size()*buffer || minIdx > bins.size()*(1-buffer), maxIdx > (bins.size() * 0.4) || maxIdx < (bins.size() * 0.6)}, {Math.abs(upperbins - lowerbins) > Math.max(upperbins, lowerbins) * 0.2, lowerbins > upperbins}};
     }
+
+    public static void saveThunderSTORM(String CSV_FILE_NAME, final FloatMatrix data){
+        List<String> ShortHeader = new ArrayList<>();
+        ShortHeader.add("id");
+        ShortHeader.add("frame");
+        ShortHeader.add("x");
+        ShortHeader.add("y");
+        ShortHeader.add("intensity");
+        ShortHeader.add("z");
+        // Creates a csv file and writes all the data to it
+        File csvOutputFile = new File(CSV_FILE_NAME);
+        try (PrintWriter pw = new PrintWriter(csvOutputFile)) {
+            pw.println(String.join(",", ShortHeader));
+            pw.println(data.toString("%f", "", "",", ", "\n"));
+        } catch(IOException error) {
+            System.out.println("Could not save CSV.");
+            error.printStackTrace();
+        }
+    }
 }
