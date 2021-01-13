@@ -72,9 +72,7 @@ import static com.wurgobes.sSMLMAnalyzer.levenshtein.getTheClosestMatch;
 // TODO
 // custom backup LUT incase imagej cant provide one
 // refactoring:
-//   FloatMatrix to DoubleMatrix
 //   No concating in calculations
-// test angle settings 0 to 360?
 // care about z?
 
 // T is only used when calling AngleAnalyzer and denotes the type of image created
@@ -146,7 +144,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
     // Variables related to visualisation
     private boolean visualisation = true;
     private boolean visualiseZOLA = false;
-    private String defaultLUT = "Spectrum.lut";
+    private String defaultLUT = "physics.lut";
     private final float[] lutRange = new float[]{0,0};
     private float binwidth = 2.5f; //Binwidth in units used in distance for histograms
     //private final int[] unit_decades = {0, 0, 0, -2, -3, -6, -9, -10, -12, -15};
@@ -1166,7 +1164,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
 
     // Only run from the IDE
     public static void main(String[] args) {
-        debug = true;
+        debug = false;
         runningFromIDE = true; //this is really dumb
 
         /*
@@ -1190,7 +1188,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
         //private final float[] distRange = {1940, 2600}; //1800 3000 (1940, 2240)
 
         //debug_arg_string = "csv_in=F:\\ThesisData\\output\\output3_drift.csv  visualisation=true";
-        debug_arg_string = "csv_in=F:\\ThesisData\\output\\output3_drift.csv angle_start=-0.094 angle_end=0.22 distance_start=1500 distance_end=2200 visualisation=true";
+        debug_arg_string = "csv_in=F:\\ThesisData\\output\\combined_drift.csv angle_start=-0.094 angle_end=0.22 distance_start=1500 distance_end=2200 visualisation=true";
         //debug_arg_string = "csv_in=F:\\ThesisData\\Test3D\\localisations_drift.csv  visualisation=true";
 
         net.imagej.ImageJ ij = new ImageJ();
