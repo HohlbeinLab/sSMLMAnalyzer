@@ -1132,11 +1132,12 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                     logService.info("ZOLA Visualisation");
 
                     try {
-                        String tmpfile;
+                        String tmpfile; // We need a tmpfile if no saving is done
 
-                        if (runningFromIDE) {
+                        if (runningFromIDE) { // Doesn;t work from IDE because of the isolated ImageJ isntance
                             System.out.println("Running from IDE does not work for ZOLA integration");
                         } else {
+                            // If we already saved, great, otherwise save a tmp thunderstorm file to use
                             if (saveSCV) {
                                 tmpfile = csv_target_dir + "\\thunderSTORM.csv";
                             } else {
@@ -1144,13 +1145,12 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                                 saveThunderSTORM(tmpfile, finalPossibilities.getColumns(new int[]{0, 1, 3, 4, 5, 10}));
                             }
 
+                            Prefs.set("Zola.showLUT", true); // Show lut on image
+                            Prefs.set("Zola.pathlocalization", tmpfile); // Load the file
+                            Prefs.set("Zola.is3Drendering", true); // Set 3D rendering
 
-                            Prefs.set("Zola.showLUT", true);
-                            Prefs.set("Zola.pathlocalization", tmpfile);
-                            Prefs.set("Zola.is3Drendering", true);
-
-                            IJ.run("Import table");
-                            IJ.run("2D/3D histogram");
+                            IJ.run("Import table"); // Import our table (also shows 2D histogram for some reason)
+                            IJ.run("2D/3D histogram"); // Show the 3D histogram (does not work from macro, and shows 2D)
                         }
                     }  catch (Exception e) {
                         logService.info("ZOLA integration failed");
