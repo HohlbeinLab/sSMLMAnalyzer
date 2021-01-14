@@ -277,7 +277,7 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
         // If it turns out someone finds an application where a larger size can occur, one can change these
         float averageSize = (data.getColumn(1).max() + data.getColumn(2).max())/2;
         double lowerCutoff = 0.01 * averageSize; // Distances between features is at min 1% of whole size
-        double upperCutoff = 0.1 * averageSize; // Distances between features is at most 10% of whole size
+        double upperCutoff = 0.4 * averageSize; // Distances between features is at most 10% of whole size
 
         for(int i = 1; i <= peaks; i++){
             float posX = offsetsX[0] - offsetsX[i]; // delta x to centre
@@ -285,7 +285,7 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
 
             // calculate distance to center of feature
             double dist = Math.sqrt(Math.pow(posX * sizeX, 2) + Math.pow(posY * sizeY, 2));
-
+            if(debug) System.out.println(dist);
             // If the feature is too close or too far, it probably is an error (and would give really wrong results
             if(dist < lowerCutoff | dist > upperCutoff) continue;
 
@@ -304,8 +304,8 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
                     .mapToDouble(a -> a)
                     .average().orElse(Double.NaN);
 
-            angle_low = angle - realAngle - std*2;
-            angle_high = angle - realAngle + std*2;
+            angle_low = angle - realAngle/2 - std*2;
+            angle_high = angle + realAngle/2 + std*2;
             if(debug)
                 logService.info("Calculating the angle was inaccurate. Angle seems to be: " + realAngle);
         }

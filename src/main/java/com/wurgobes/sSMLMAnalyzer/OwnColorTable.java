@@ -48,6 +48,7 @@ public class OwnColorTable{
         int[] r = {0,0,1,25,49,73,98,122,146,162,173,184,195,207,217,229,240,252,255,255,255,255,255,255,255,255,255,255,255,255,255,255};
         int[] g = {0,0,0,0,0,0,0,0,0,0,0,0,0,14,35,57,79,101,117,133,147,161,175,190,205,219,234,248,255,255,255,255};
         int[] b = {0,61,96,130,165,192,220,227,210,181,151,122,93,64,35,5,0,0,0,0,0,0,0,0,0,0,0,35,98,160,223,255};
+        CT = new Color[r.length];
         for (int i=0; i<r.length; i++) {
             CT[i] = new Color(r[i], g[i], b[i]);
         }
@@ -55,7 +56,7 @@ public class OwnColorTable{
 
 
     public Color getColor(float value, double min, double max){
-        value = (float) (Math.max(Math.min((value - min)/(max - min), 1), 0) * 255); //remap from 0 to 1
+        value = (float) (Math.max(Math.min((value - min)/(max - min), 1), 0) * CT.length); //remap from 0 to 1
         return CT[(int) value];
     }
 

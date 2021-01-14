@@ -508,11 +508,18 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
 
             // Debug stuff for skipping calculation and testing visualisation
             if (debug) {
-                filePath = "C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\results\\thunderSTORM.csv";
-                processing = false;
-                visualisation = false;
-                visualiseZOLA = true;
+                //filePath = "C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\results\\thunderSTORM.csv";
+                filePath = "C:\\Users\\Martijn\\Downloads\\Thunderstorm results no drift no filter.csv";
+                processing = true;
+                visualisation = true;
+                visualiseZOLA = false;
                 saveSCV = false;
+                searchAngle = true;
+
+                //angInput[0] = -0.1f;
+                //angInput[1] = 0.1f;
+                //distInput[0] = 3500;
+                //distInput[1] = 4500;
                 try {
                     System.out.println("Found " + ownColorTable.getLuts().length + " LUTs");
                     System.out.println(Arrays.toString(ownColorTable.getLuts()));
@@ -586,7 +593,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                 data = floatMatrix.getColumns(new int[]{revOptionsIndices[1], revOptionsIndices[2], revOptionsIndices[3], revOptionsIndices[5]});
 
                 // If any var is not set, we have to calculate them all
-                if (angRange[0] * angRange[1] * distRange[0] * distRange[1] == 0) {
+                if (angInput[0] * angInput[1] * angInput[0] * angInput[1] == 0) {
 
                     // Instantiate the analyzer with the proper data and run it
                     AngleAnalyzer<T> angleAnalyzer = new AngleAnalyzer<>(data, flipAngles, mirrorAngles, logService, debug);
@@ -614,6 +621,11 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                 } else {
                     // if all values are filled in this is the only check we need to do
                     succes = !(distRange[0] > distRange[1]);
+
+                    angRange[0] = angInput[0];
+                    angRange[1] = angInput[1];
+                    distRange[0] = distInput[0];
+                    distRange[1] = distInput[1];
 
                 }
             } else {
@@ -1193,6 +1205,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
         debug_arg_string = "csv_in=F:\\ThesisData\\output\\output3_drift.csv order_number=2 angle_start=-0.094 angle_end=0.22 distance_start=1500 distance_end=2200 visualisation=true";
         //debug_arg_string = "csv_in=F:\\ThesisData\\Test3D\\localisations_drift.csv  visualisation=true";
 
+        debug_arg_string = "";
         net.imagej.ImageJ ij = new ImageJ();
         ij.ui().showUI();
 
