@@ -31,11 +31,13 @@ import net.imglib2.util.RealSum;
 
 import org.apache.commons.math3.stat.descriptive.moment.StandardDeviation;
 import org.jblas.FloatMatrix;
+import org.jblas.ranges.IntervalRange;
 
 
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 
@@ -121,9 +123,9 @@ public class Util {
         return result;
     }
 
-    public static void SaveCSV(final FloatMatrix data, List<String> Headers, String CSV_FILE_NAME)  {
+    public static void SaveCSV(final FloatMatrix data, List<String> Headers, Path CSV_FILE_NAME)  {
         // Creates a csv file and writes all the data to it
-        File csvOutputFile = new File(CSV_FILE_NAME);
+        File csvOutputFile = CSV_FILE_NAME.toFile();
         try (PrintWriter pw = new PrintWriter(csvOutputFile)) {
             pw.println(String.join(",", Headers));
             pw.println(data.toString("%f", "", "",", ", "\n"));
@@ -202,29 +204,32 @@ public class Util {
         return A.getRows(indices);
     }
 
-    public static FloatMatrix connectOrders(final FloatMatrix intermediate, int orders, int orderCollumns){
+    public static FloatMatrix connectOrders(FloatMatrix intermediate, int orders, int orderColumns){
         // This function takes all points and tried to connect the different points together for at most N orders.
         // If more points are found this is echo'd
         boolean checkMoreOrders = true;
+        int max_orders = 5;
+        if(orders > max_orders) max_orders = orders;
+        final FloatMatrix intermediateExtended = extend(intermediate, intermediate.rows, max_orders * orderColumns);
         List<Integer> toKeep = new ArrayList<>();
-        for(int row = 0; row < intermediate.rows; row ++){
-            float index = intermediate.get(row, 2);
+        for(int row = 0; row < intermediateExtended.rows; row ++){
+            float index = intermediateExtended.get(row, 2);
 
-            if(intermediate.getColumn(6).eq(index).sum() == 0.0f) { //Start of chain
+            if(intermediateExtended.getColumn(6).eq(index).sum() == 0.0f) { //Start of chain
                 toKeep.add(row);
 
-                int connected_to = (int) intermediate.get(row, 6);
-                int[] connected_indices = intermediate.getColumn(2).eq(connected_to).findIndices();
+                int connected_to = (int) intermediateExtended.get(row, 6);
+                int[] connected_indices = intermediateExtended.getColumn(2).eq(connected_to).findIndices();
 
                 if(connected_indices.length > 0){
                     //We already did the 0-1 connection
 
-                    intermediate.putRow(row, recursiveSearch(intermediate, intermediate.getRow(row), connected_indices, 2, orders, orderCollumns));
+                    intermediateExtended.putRow(row, recursiveSearch(intermediateExtended, intermediateExtended.getRow(row), connected_indices, 2, max_orders, orderColumns));
 
                     if(checkMoreOrders){
-                        connected_to = (int) intermediate.get(row, (orders-1) * orderCollumns);
+                        connected_to = (int) intermediateExtended.get(row, (orders-1) * orderColumns);
 
-                        if(intermediate.getColumn(2).eq(connected_to).sum() > 1.0f) {
+                        if(intermediateExtended.getColumn(2).eq(connected_to).sum() > 1.0f) {
                             System.out.println("There seem to be more orders than " + orders);
                             checkMoreOrders = false;
                         }
@@ -235,7 +240,8 @@ public class Util {
         }
 
         int[] indices = toKeep.stream().mapToInt(i->i).toArray();
-        return intermediate.getRows(indices);
+
+        return intermediateExtended.getColumns(new IntervalRange(0, orders * orderColumns)).getRows(indices);
     }
 
     private static FloatMatrix recursiveSearch(FloatMatrix intermediate, FloatMatrix rowData, int[] connected_indices, int order, int max_order, int orderCollumns) {
@@ -457,7 +463,7 @@ public class Util {
         return new boolean[][] {{(std.evaluate(toDouble(bins)) / A.rows) > 0.05, minIdx < bins.size()*buffer || minIdx > bins.size()*(1-buffer), maxIdx > (bins.size() * 0.4) || maxIdx < (bins.size() * 0.6)}, {Math.abs(upperbins - lowerbins) > Math.max(upperbins, lowerbins) * 0.2, lowerbins > upperbins}};
     }
 
-    public static void saveThunderSTORM(String CSV_FILE_NAME, final FloatMatrix data){
+    public static void saveThunderSTORM(Path CSV_FILE_NAME, final FloatMatrix data){
         List<String> ShortHeader = new ArrayList<>();
         ShortHeader.add("id");
         ShortHeader.add("frame");
@@ -466,7 +472,7 @@ public class Util {
         ShortHeader.add("intensity");
         ShortHeader.add("z");
         // Creates a csv file and writes all the data to it
-        File csvOutputFile = new File(CSV_FILE_NAME);
+        File csvOutputFile = CSV_FILE_NAME.toFile();
         try (PrintWriter pw = new PrintWriter(csvOutputFile)) {
             pw.println(String.join(",", ShortHeader));
             pw.println(data.toString("%f", "", "",", ", "\n"));

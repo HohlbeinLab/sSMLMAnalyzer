@@ -50,6 +50,8 @@ import org.scijava.plugin.*;
 import java.io.*;
 
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -1120,31 +1122,31 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                     ShortHeader.add("z [" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "]");
 
                     // Save all data using the proper header, including one that easily is loaded into ThunderSTORM again for visualisation etc
-                    SaveCSV(finalPossibilities, LongHeader, csv_target_dir + "\\all_orders.csv");
+                    SaveCSV(finalPossibilities, LongHeader, Paths.get(csv_target_dir, "all_orders.csv") );
 
-                    SaveCSV(halfOrderMatrix, ShortHeader, csv_target_dir + "\\accurate_positions.csv");
-                    SaveCSV(finalPossibilities.getColumns(new int[]{0, 1, 3, 4, 5, 10}), ShortHeader, csv_target_dir + "\\thunderSTORM.csv");
+                    SaveCSV(halfOrderMatrix, ShortHeader, Paths.get(csv_target_dir, "accurate_positions.csv"));
+                    SaveCSV(finalPossibilities.getColumns(new int[]{0, 1, 3, 4, 5, 10}), ShortHeader, Paths.get(csv_target_dir, "thunderSTORM.csv"));
                 }
 
                 if(visualiseZOLA) {
                     logService.info("ZOLA Visualisation");
 
                     try {
-                        String tmpfile; // We need a tmpfile if no saving is done
+                        Path tmpfile; // We need a tmpfile if no saving is done
 
                         if (runningFromIDE) { // Doesn;t work from IDE because of the isolated ImageJ isntance
                             System.out.println("Running from IDE does not work for ZOLA integration");
                         } else {
                             // If we already saved, great, otherwise save a tmp thunderstorm file to use
                             if (saveSCV) {
-                                tmpfile = csv_target_dir + "\\thunderSTORM.csv";
+                                tmpfile = Paths.get(csv_target_dir, "thunderSTORM.csv");
                             } else {
-                                tmpfile = IJ.getDirectory("temp") + "tmp.csv";
+                                tmpfile = Paths.get(IJ.getDirectory("temp"), "tmp.csv");
                                 saveThunderSTORM(tmpfile, finalPossibilities.getColumns(new int[]{0, 1, 3, 4, 5, 10}));
                             }
 
                             Prefs.set("Zola.showLUT", true); // Show lut on image
-                            Prefs.set("Zola.pathlocalization", tmpfile); // Load the file
+                            Prefs.set("Zola.pathlocalization", tmpfile.toString()); // Load the file
                             Prefs.set("Zola.is3Drendering", true); // Set 3D rendering
 
                             IJ.run("Import table"); // Import our table (also shows 2D histogram for some reason)
@@ -1188,7 +1190,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
         //private final float[] distRange = {1940, 2600}; //1800 3000 (1940, 2240)
 
         //debug_arg_string = "csv_in=F:\\ThesisData\\output\\output3_drift.csv  visualisation=true";
-        debug_arg_string = "csv_in=F:\\ThesisData\\output\\combined_drift.csv angle_start=-0.094 angle_end=0.22 distance_start=1500 distance_end=2200 visualisation=true";
+        debug_arg_string = "csv_in=F:\\ThesisData\\output\\output3_drift.csv order_number=2 angle_start=-0.094 angle_end=0.22 distance_start=1500 distance_end=2200 visualisation=true";
         //debug_arg_string = "csv_in=F:\\ThesisData\\Test3D\\localisations_drift.csv  visualisation=true";
 
         net.imagej.ImageJ ij = new ImageJ();
