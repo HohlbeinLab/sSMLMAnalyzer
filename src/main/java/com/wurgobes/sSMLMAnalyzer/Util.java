@@ -112,9 +112,10 @@ public class Util {
         return list.stream().mapToDouble(i->i).toArray();
     }
 
-    public static FloatMatrix extend(final FloatMatrix A, int rows, int collumns){
-        // extends a Floatmatrix with 0's to the size provided
-        FloatMatrix result = new FloatMatrix(rows, collumns);
+    public static FloatMatrix extend(final FloatMatrix A, int rows, int columns){
+        // extends a FloatMatrix with 0's to the size provided
+        if(A.rows == rows && A.columns == columns) return A;
+        FloatMatrix result = new FloatMatrix(rows, columns);
         for(int i = 0; i < A.rows; i++){
             for(int j = 0; j < A.columns; j++){
                 result.put(i, j, A.get(i, j));
@@ -215,10 +216,10 @@ public class Util {
         for(int row = 0; row < intermediateExtended.rows; row ++){
             float index = intermediateExtended.get(row, 2);
 
-            if(intermediateExtended.getColumn(6).eq(index).sum() == 0.0f) { //Start of chain
+            if(intermediateExtended.getColumn(7).eq(index).sum() == 0.0f) { //Start of chain
                 toKeep.add(row);
 
-                int connected_to = (int) intermediateExtended.get(row, 6);
+                int connected_to = (int) intermediateExtended.get(row, 7);
                 int[] connected_indices = intermediateExtended.getColumn(2).eq(connected_to).findIndices();
 
                 if(connected_indices.length > 0){
@@ -234,7 +235,6 @@ public class Util {
                             checkMoreOrders = false;
                         }
                     }
-
                 }
             }
         }
@@ -249,19 +249,19 @@ public class Util {
         // Ties are broken by which point has the closest angle to the original pair
         // This is recursive to find all next orders
 
-        //i.e. 12: id, 13: x, 14: y, 15: intensity, 16: distance, 17: angle
-        int[] target_range = new int[]{order * orderCollumns, 1 + (order * orderCollumns), 2 + (order * orderCollumns), 3 + (order * orderCollumns), 4 + (order * orderCollumns), 5 + (order * orderCollumns)};
+        //i.e. 14: id, 15: x, 16: y, 17: z, 18: intensity, 19: distance, 20: angle
+        int[] target_range = new int[]{order * orderCollumns, 1 + (order * orderCollumns), 2 + (order * orderCollumns), 3 + (order * orderCollumns), 4 + (order * orderCollumns), 5 + (order * orderCollumns), 6 + (order * orderCollumns)};
 
         if (connected_indices.length == 1) {
             FloatMatrix target_row = intermediate.getRow(connected_indices[0]);
-            rowData.put(target_range, target_row.getColumns(new int[]{6, 7, 8, 9, 10, 11}));
+            rowData.put(target_range, target_row.getColumns(new int[]{7, 8, 9, 10, 11, 12, 13}));
         } else {
             FloatMatrix intermediateResults = new FloatMatrix(connected_indices.length, rowData.columns);
 
             for (int i = 0; i < connected_indices.length; i++) {
 
                 FloatMatrix target_row = intermediate.getRow(connected_indices[i]);
-                intermediateResults.putRow(i, rowData.dup().put(target_range, target_row.getColumns(new int[]{6, 7, 8, 9, 10, 11})));
+                intermediateResults.putRow(i, rowData.dup().put(target_range, target_row.getColumns(new int[]{7, 8, 9, 10, 11, 12, 13})));
                 int[] nextConnectedIndices = intermediate.getColumn(2).eq(target_row.get(target_range[0])).findIndices();
                 if (nextConnectedIndices.length > 0 && order + 1 < max_order)
                     intermediateResults.putRow(i, recursiveSearch(intermediate, intermediateResults.getRow(i), nextConnectedIndices, order + 1, max_order, orderCollumns));
@@ -467,10 +467,10 @@ public class Util {
         List<String> ShortHeader = new ArrayList<>();
         ShortHeader.add("id");
         ShortHeader.add("frame");
-        ShortHeader.add("x");
-        ShortHeader.add("y");
-        ShortHeader.add("intensity");
-        ShortHeader.add("z");
+        ShortHeader.add("x [nm]");
+        ShortHeader.add("y [nm]");
+        ShortHeader.add("intensity [photons]");
+        ShortHeader.add("z [nm]");
         // Creates a csv file and writes all the data to it
         File csvOutputFile = CSV_FILE_NAME.toFile();
         try (PrintWriter pw = new PrintWriter(csvOutputFile)) {
@@ -480,5 +480,18 @@ public class Util {
             System.out.println("Could not save CSV.");
             error.printStackTrace();
         }
+    }
+
+    public static FloatMatrix sort(FloatMatrix matrix, int column){
+        // Sorts the matrix based on a column
+        FloatMatrix result = new FloatMatrix(matrix.rows, matrix.columns);
+
+        int[] permutation = matrix.getColumn(column).sortingPermutation();
+
+        for(int i = 0; i < matrix.rows; i++){
+            result.putRow(i, matrix.getRow(permutation[i]));
+        }
+
+        return result;
     }
 }

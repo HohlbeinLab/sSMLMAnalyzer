@@ -110,7 +110,7 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
         final float[] reduce = new float[] {(float) Math.ceil((data.getColumn(1).max() + 1)/target_size), (float) Math.ceil((data.getColumn(2).max() + 1)/target_size)};
 
         // We can only use FFT on an image, so we create a 1024x1024 image from the points
-        ImagePlus temp = getImageFromPoints(data.getColumns(new int[]{1, 2, 3}), reduce, dimensions[0], dimensions[1]);
+        ImagePlus temp = getImageFromPoints(data.getColumns(new int[]{1, 2, 4}), reduce, dimensions[0], dimensions[1]);
 
         if(debug) temp.show();
 
@@ -243,7 +243,12 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
         ParticleAnalyzer particleAnalyzer = new ParticleAnalyzer(SHOW_MASKS, Analyzer.getMeasurements() | Analyzer.CENTER_OF_MASS, resultsTable, 0, 100);
         particleAnalyzer.analyze(masked);
 
-        if(!debug) WindowManager.closeAllWindows();
+        if(!debug) {
+            WindowManager.closeAllWindows();
+        } else {
+            resultsTable.show("Features");
+        }
+
 
         // get the results from the table
         float[] offsetsX = resultsTable.getColumn(resultsTable.getColumnIndex("XM"));
