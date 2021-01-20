@@ -24,6 +24,7 @@ SOFTWARE.
  */
 
 import org.jblas.FloatMatrix;
+import org.scijava.log.LogService;
 
 import java.io.BufferedReader;
 import java.io.FileInputStream;
@@ -37,6 +38,7 @@ public class OwnFloatMatrixLoader {
 
 
     private List<String> columns = new ArrayList<>();
+
 
     public FloatMatrix loadCSVFile(String filename) throws IOException {
 

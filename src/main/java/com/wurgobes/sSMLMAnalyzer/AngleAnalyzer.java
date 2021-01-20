@@ -10,10 +10,10 @@ It determines the distance(s) between the pairs and the angle at which they migh
 This is far from an infallible process, which is why the user can override this.
 Sometimes the result might be flipped n*90 degrees, or mirrored, which is why this script might be run up to 4 times.
 
-This entire process can be replicated in ImageJ to allow for manual tweaks
-This is more accurate, but more complicated ofcourse.
+This entire process can be replicated in ImageJ to allow for manual tweaks.
+This is more accurate, but a more complicated process.
 
-The steps to do so are included in the manualAngleAnalyzer.md file
+The steps to do so are included in the AngleDistance.md file
 
 This software is released under the GPL v3. You may copy, distribute and modify
 the software as long as you track changes/dates in source files. Any

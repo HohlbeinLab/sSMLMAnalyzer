@@ -17,6 +17,10 @@ The start and end settings will calculate any value that is unset(=0).<br>
 * Angles start and end - The range between which the angle must be (rad)<br>
 * Distance start and end - The range between the distance between features must me<br>
 * Number of Orders - The maximum number of orders to search for<br>
+<br>
+* Restrict Delta Z - A pair is not allowed to have more than delta z difference<br>
+* max delta z [nm] - The maximum delta z.<br>
+<br>
 * Intensity Order Required - Require that each next order has less intensity<br>
 * Ratio between orders - The amount by which the next order has less intensity<br>
 <br>
@@ -50,6 +54,8 @@ The keywords available are:<br>
 * angle_end - upper angle boundary (rad)<br>
 * distance_start - lower distance boundary<br>
 * distance_end - upper distance boundary<br>
+* check_z - Require that a pair has a maximum delta z
+* check_z_margin - The maximum delta z a pair can have (nm)
 * order_number - The maximum number of orders to search for<br>
 * check_order_intensity - Require that each next order has less intensity<br>
 * check_order_ratio - The amount by which the next order has less intensity<br>

@@ -10,7 +10,7 @@ This Plugin features a module that tries to determine the angle of the grating, 
 One can get the Plugin by using the download link below, or by subscribing to the Hohlbein lab update site. You can subscribe by going to Help > Update... > Manage Update Sites and checking the Hohlbein lab site. It will automatically be downloaded and updated.
 
 This plugin requires two files: sSMLMA.jar and jblas.jar:  
-The latest version of sSMLA.jar (latest = 0.9.5) can be found [Here](https://github.com/HohlbeinLab/sSMLMAnalyzer)  
+The latest version of sSMLA.jar (latest = 0.9.6) can be found [Here](https://github.com/HohlbeinLab/sSMLMAnalyzer)  
 The latest version of jblas.jar can be found [Here](https://repo1.maven.org/maven2/org/jblas/jblas/1.2.5/jblas-1.2.5.jar)
 
 
@@ -28,6 +28,9 @@ The start and end settings will calculate any value that is unset(=0).
 * Angles start and end - The range between which the angle must be (rad)
 * Distance start and end - The range between the distance between features must me
 * Number of Orders - The maximum number of orders to search for
+  
+* Restrict Delta Z - A pair is not allowed to have more than delta z difference  
+* max delta z [nm] - The maximum delta z.  
 * Intensity Order Required - Require that each next order has less intensity
 * Ratio between orders - The amount by which the next order has less intensity
 
@@ -62,7 +65,9 @@ The keywords available are:
 * angle_end - upper angle boundary (rad)
 * distance_start - lower distance boundary
 * distance_end - upper distance boundary
-* order_number - The maximum number of orders to search for
+* order_number - The maximum number of orders to search for  
+* check_z - Require that a pair has a maximum delta z
+* check_z_margin - The maximum delta z a pair can have (nm)
 * check_order_intensity - Require that each next order has less intensity
 * check_order_ratio - The amount by which the next order has less intensity
 * angle_flip - Flip the Angle
