@@ -494,4 +494,12 @@ public class Util {
 
         return result;
     }
+
+    public static void fillCollumn(FloatMatrix A, int c, float value){
+        // Fill a collumn with a single default value
+        float[] tempArr = new float[A.rows];
+        Arrays.fill(tempArr, value);
+
+        A.putColumn(c, new FloatMatrix(tempArr));
+    }
 }

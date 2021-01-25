@@ -629,12 +629,17 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
 
                 // frame, x, y, z, intensity
                 // Load the relevant data, if no z is found, load a column of 0's
-                if(revOptionsIndices[4] == -1){
+                if(revOptionsIndices[4] == -1 || revOptionsIndices[5] == -1){
                     data = new FloatMatrix(floatMatrix.rows, 5);
                     data.putColumn(0, floatMatrix.getColumn(revOptionsIndices[1])); // frame
                     data.putColumn(1, floatMatrix.getColumn(revOptionsIndices[2])); // x
                     data.putColumn(2, floatMatrix.getColumn(revOptionsIndices[3])); // y
-                    data.putColumn(4, floatMatrix.getColumn(revOptionsIndices[5])); // intensity
+                    if(revOptionsIndices[4] != -1) data.putColumn(3, floatMatrix.getColumn(revOptionsIndices[4])); // z
+                    if(revOptionsIndices[5] != -1)
+                        data.putColumn(4, floatMatrix.getColumn(revOptionsIndices[5])); // intensity
+                    else
+                        fillCollumn(data, 4, 1);
+
                 } else {
                     hasZ = true;
                     data = floatMatrix.getColumns(new int[]{revOptionsIndices[1], revOptionsIndices[2], revOptionsIndices[3], revOptionsIndices[4],revOptionsIndices[5]});
@@ -1038,24 +1043,24 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
 
                         // Remove unneeded Z column before saving
                         if(!hasZ){
-                            FloatMatrix noZMatrix = new FloatMatrix(floatMatrix.rows, orders * (orderColumns - 1));
+                            FloatMatrix noZMatrix = new FloatMatrix(finalPossibilities.rows, orders * (orderColumns - 1));
 
                             // No range copy, so this is slow
-                            noZMatrix.putColumn(0, floatMatrix.getColumn(0)); // id
-                            noZMatrix.putColumn(1, floatMatrix.getColumn(1)); // frame
-                            noZMatrix.putColumn(2, floatMatrix.getColumn(2)); // id in frame
-                            noZMatrix.putColumn(3, floatMatrix.getColumn(3)); // x
-                            noZMatrix.putColumn(4, floatMatrix.getColumn(4)); // y
-                            noZMatrix.putColumn(5, floatMatrix.getColumn(6)); // intensity
+                            noZMatrix.putColumn(0, finalPossibilities.getColumn(0)); // id
+                            noZMatrix.putColumn(1, finalPossibilities.getColumn(1)); // frame
+                            noZMatrix.putColumn(2, finalPossibilities.getColumn(2)); // id in frame
+                            noZMatrix.putColumn(3, finalPossibilities.getColumn(3)); // x
+                            noZMatrix.putColumn(4, finalPossibilities.getColumn(4)); // y
+                            noZMatrix.putColumn(5, finalPossibilities.getColumn(6)); // intensity
 
                             //i.e. 14: id, 15: x, 16: y, 17: z, 18: intensity, 19: distance, 20: angle
                             for(int i = 1; i < orders; i++){
-                                noZMatrix.putColumn((orderColumns - 1) * i, floatMatrix.getColumn(orderColumns * i)); // id in frame
-                                noZMatrix.putColumn((orderColumns - 1) * i + 1, floatMatrix.getColumn(orderColumns * i + 1)); // x
-                                noZMatrix.putColumn((orderColumns - 1) * i + 2, floatMatrix.getColumn(orderColumns * i + 2)); // y
-                                noZMatrix.putColumn((orderColumns - 1) * i + 3, floatMatrix.getColumn(orderColumns * i + 3)); // intensity
-                                noZMatrix.putColumn((orderColumns - 1) * i + 4, floatMatrix.getColumn(orderColumns * i + 4)); // distance
-                                noZMatrix.putColumn((orderColumns - 1) * i + 5, floatMatrix.getColumn(orderColumns * i + 5)); // angle
+                                noZMatrix.putColumn((orderColumns - 1) * i, finalPossibilities.getColumn(orderColumns * i)); // id in frame
+                                noZMatrix.putColumn((orderColumns - 1) * i + 1, finalPossibilities.getColumn(orderColumns * i + 1)); // x
+                                noZMatrix.putColumn((orderColumns - 1) * i + 2, finalPossibilities.getColumn(orderColumns * i + 2)); // y
+                                noZMatrix.putColumn((orderColumns - 1) * i + 3, finalPossibilities.getColumn(orderColumns * i + 3)); // intensity
+                                noZMatrix.putColumn((orderColumns - 1) * i + 4, finalPossibilities.getColumn(orderColumns * i + 4)); // distance
+                                noZMatrix.putColumn((orderColumns - 1) * i + 5, finalPossibilities.getColumn(orderColumns * i + 5)); // angle
                             }
                         }
 
