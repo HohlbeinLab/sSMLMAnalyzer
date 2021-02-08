@@ -37,6 +37,7 @@ public class OwnColorTable{
                 }
             }
             catch (Exception e){
+                //e.printStackTrace();
                 backupLUT();
             }
         }
@@ -56,8 +57,8 @@ public class OwnColorTable{
 
 
     public Color getColor(float value, double min, double max){
-        value = (float) (Math.max(Math.min((value - min)/(max - min), 1), 0) * CT.length); //remap from 0 to 1
-        return CT[(int) value];
+        int v = (int)(Math.max(Math.min((value - min)/(max - min), 1), 0) * (CT.length-1)); //remap from 0 to number of lut colors
+        return CT[v];
     }
 
     public String[] getLuts(){

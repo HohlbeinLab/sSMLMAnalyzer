@@ -1080,12 +1080,12 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                             halfOrderMatrix.putColumn(3, finalPossibilities.getColumn(4).add(finalPossibilities.getColumn(9)).divi(2.0f)); //y
                             if(hasZ) halfOrderMatrix.putColumn(4, finalPossibilities.getColumn(5).add(finalPossibilities.getColumn(10)).divi(2.0f)); // z
                             halfOrderMatrix.putColumn(5, finalPossibilities.getColumn(6)); //intensity
-                            halfOrderMatrix.putColumn(6, finalPossibilities.getColumn(12)); //intensity
-                            halfOrderMatrix.putColumn(7, finalPossibilities.getColumn(13)); //distance
+                            halfOrderMatrix.putColumn(6, finalPossibilities.getColumn(12)); //distance
+                            halfOrderMatrix.putColumn(7, finalPossibilities.getColumn(13)); //angle
 
                             allOrdersCombined.putColumn(0, finalPossibilities.getColumn(0)); //id
                             allOrdersCombined.putColumn(1, finalPossibilities.getColumn(1)); //frame
-                            allOrdersCombined.putColumn(4, finalPossibilities.getColumn(6)); //intensity
+                            allOrdersCombined.putColumn(5, finalPossibilities.getColumn(6)); //intensity
 
 
                             FloatMatrix offsets = new FloatMatrix(finalPossibilities.rows, 5);
@@ -1108,8 +1108,9 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                             allOrdersCombined.putColumn(2, finalPossibilities.getColumn(3));
                             allOrdersCombined.putColumn(3, finalPossibilities.getColumn(4));
                             allOrdersCombined.putColumn(4, finalPossibilities.getColumn(5));
-                            allOrdersCombined.putColumn(5, offsets.getColumn(3));
-                            allOrdersCombined.putColumn(6, offsets.getColumn(4));
+                            allOrdersCombined.putColumn(6, offsets.getColumn(3));
+                            allOrdersCombined.putColumn(7, offsets.getColumn(4));
+
 
 
                             FloatMatrix relevantRows = finalPossibilities.getColumn((orders - 1) * orderColumns).ne(0.0f);
@@ -1193,9 +1194,8 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
 
                             Plot distancePlot = new Plot("Distance", "x [" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "]", "y [" + unit_prefixes[unitsIndices[revOptionsIndices[3]]] + "]");
 
-                            for (int i = 0; i < finalPossibilities.rows; i++) {
-
-                                distancePlot.setColor(ownColorTable.getColor(allOrdersCombined.get(i, 5), distRange[0], distRange[1]));
+                            for (int i = 0; i < halfOrderMatrix.rows; i++) {
+                                distancePlot.setColor(ownColorTable.getColor(halfOrderMatrix.get(i, 6), distRange[0], distRange[1]));
 
                                 distancePlot.add(shapes[0], toDouble(halfOrderMatrix.get(i, 2)), toDouble(halfOrderMatrix.get(i, 3))); // 3 4
                             }
@@ -1204,6 +1204,25 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                             addLutLegend(distancePlot, ownColorTable, "Distance", 512, distRange[0], distRange[1]); // Add the LUT as a legend
                             distancePlot.show();
                             distancePlot.setLimits(Float.NaN, Float.NaN, Float.NaN, Float.NaN); // Ensure all points are visible, again
+
+                            /*
+                            {
+                                Plot distancePlot2 = new Plot("Distance2", "x [" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "]", "y [" + unit_prefixes[unitsIndices[revOptionsIndices[3]]] + "]");
+
+                                for (int i = 0; i < finalPossibilities.rows; i++) {
+                                    distancePlot2.setColor(ownColorTable.getColor(finalPossibilities.get(i, 12), distRange[0], distRange[1]));
+
+                                    distancePlot2.add(shapes[0], toDouble(finalPossibilities.get(i, 3)), toDouble(finalPossibilities.get(i, 4))); // 3 4
+                                    distancePlot2.add(shapes[0], toDouble(finalPossibilities.get(i, 8)), toDouble(finalPossibilities.get(i, 9))); // 3 4
+
+                                }
+
+                                distancePlot2.setLimitsToFit(true); // Ensure all points are visible
+                                addLutLegend(distancePlot2, ownColorTable, "Distance", 512, distRange[0], distRange[1]); // Add the LUT as a legend
+                                distancePlot2.show();
+                                distancePlot2.setLimits(Float.NaN, Float.NaN, Float.NaN, Float.NaN); // Ensure all points are visible, again
+                            }
+                             */
                         }
 
                         if (saveSCV) {
@@ -1236,12 +1255,15 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                             ShortHeader.add("y [" + unit_prefixes[unitsIndices[revOptionsIndices[3]]] + "]");
                             if(hasZ) ShortHeader.add("z [" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "]");
                             ShortHeader.add("intensity [" + unit_prefixes[unitsIndices[revOptionsIndices[5]]] + "]");
+                            ShortHeader.add("distance [" + distanceUnit + "]");
+                            ShortHeader.add("angle");
 
 
                             // Save all data using the proper header, including one that easily is loaded into ThunderSTORM again for visualisation etc
                             SaveCSV(finalPossibilities, LongHeader, Paths.get(csv_target_dir, "all_orders.csv") );
 
-                            SaveCSV(halfOrderMatrix, ShortHeader, Paths.get(csv_target_dir, "accurate_positions.csv"));
+                            SaveCSV(halfOrderMatrix, ShortHeader, Paths.get(csv_target_dir, "two_orders_combined_positions.csv"));
+                            SaveCSV(allOrdersCombined, ShortHeader, Paths.get(csv_target_dir, "all_orders_combined_positions.csv"));
                             saveThunderSTORM(Paths.get(csv_target_dir, "thunderSTORM.csv"), finalPossibilities.getColumns(new int[]{0, 1, 3, 4, 6, 10}));
                         }
 
@@ -1295,26 +1317,25 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
         "visualisation", "hist_binwidth", "LUT", "LUT_start", "LUT_end"
         */
 
-        //private String csv_target_dir = "C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\results";
+        // private String csv_target_dir = "C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\results";
 
-        //private String filePath = "F:\\ThesisData\\output\\output3_drift.csv";
-        //private String filePath = "F:\\ThesisData\\output\\combined_drift.csv";
-        //private float[] angRange = new float[] {(float) (-0.03 * Math.PI), (float) (0.07 * Math.PI)};
-        //private float[] distRange = new float[] {1500, 2200};
+        // private String filePath = "F:\\ThesisData\\output\\output3_drift.csv";
+        // private String filePath = "F:\\ThesisData\\output\\combined_drift.csv";
+        // private float[] angRange = new float[] {(float) (-0.03 * Math.PI), (float) (0.07 * Math.PI)};
+        // private float[] distRange = new float[] {1500, 2200};
 
-        //private String filePath = "F:\\ThesisData\\output\\4_grating_drift.csv";
-        //private final float[] angRange = {(float) (-1 * Math.PI), (float) (-0.95 * Math.PI) }; //more than and less than
-        //private final float[] distRange = {1940, 2600}; //1800 3000 (1940, 2240)
+        // private String filePath = "F:\\ThesisData\\output\\4_grating_drift.csv";
+        // private final float[] angRange = {(float) (-1 * Math.PI), (float) (-0.95 * Math.PI) }; //more than and less than
+        // private final float[] distRange = {1940, 2600}; //1800 3000 (1940, 2240)
 
-        debug_arg_string = "csv_in=F:\\ThesisData\\output\\output3_drift.csv csv_out=C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\testing visualisation=true";
-        //debug_arg_string = "csv_in=F:\\ThesisData\\output\\niels.csv csv_out=C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\testing order_number=2 visualisation=true";
-        //debug_arg_string = "csv_in=F:\\ThesisData\\Test3D\\localisations_drift.csv  visualisation=true";
+        debug_arg_string = "csv_in=F:\\ThesisData\\output\\combined_drift.csv csv_out=C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\testing visualisation=true";
+        // debug_arg_string = "csv_in=F:\\ThesisData\\output\\niels.csv csv_out=C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\testing order_number=2 visualisation=true";
+        // debug_arg_string = "csv_in=F:\\ThesisData\\Test3D\\localisations_drift.csv visualisation=true";
 
         //debug_arg_string = "";
         net.imagej.ImageJ ij = new ImageJ();
         ij.ui().showUI();
 
         ij.command().run(sSMLMA.class, true);
-
     }
 }
