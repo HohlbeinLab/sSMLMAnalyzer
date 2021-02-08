@@ -1237,7 +1237,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                             ShortHeader.add("frame");
 
                             // Pre-create the distance unit for the distance
-                            String distanceUnit = (unit_prefixes[unitsIndices[revOptionsIndices[2]]].equals(unit_prefixes[unitsIndices[revOptionsIndices[3]]]) ? unit_prefixes[unitsIndices[revOptionsIndices[2]]] : ("(" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "*" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + ")^½"));
+                            String distanceUnit = (unit_prefixes[unitsIndices[revOptionsIndices[2]]].equals(unit_prefixes[unitsIndices[revOptionsIndices[3]]]) ? unit_prefixes[unitsIndices[revOptionsIndices[2]]] : ("(" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "*" + unit_prefixes[unitsIndices[revOptionsIndices[3]]] + ")^0.5"));
                             // Add the headers for each order
                             for (int i = 0; i <= orders; i++) {
                                 LongHeader.add("index " + i);
