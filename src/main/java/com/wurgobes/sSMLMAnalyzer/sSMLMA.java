@@ -48,6 +48,7 @@ SOFTWARE.
  */
 
 
+import com.wurgobes.sSMLMAnalyzer.CustomPlot.CustomPlot;
 import ij.*;
 import static ij.util.ThreadUtil.*;
 import ij.gui.HistogramWindow;
@@ -204,6 +205,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
         if (debug || doingRetry) return true;
 
         String arg; // Holds the macro arguments
+        ownColorTable = new OwnColorTable(lutService);
 
         // Loading the debug string if its set
         if (debug_arg_string.equals("")) {
@@ -331,20 +333,6 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                 }
             }
 
-            // Check if the LUT provided works, otherwise try the default
-            if(visualisation) {
-                try {
-                    ownColorTable.setLut(defaultLUT);
-                } catch (Exception e) {
-                    logService.info("Failed to set LUT.\nTrying Default: NCSA PalEdit/6_shades.lut");
-                    try {
-                        ownColorTable.setLut("NCSA PalEdit/6_shades.lut");
-                    } catch (Exception e2) {
-                        logService.info("Failed to set LUT again?.\n");
-                        return false;
-                    }
-                }
-            }
         } else {
             InputStream is = sSMLMA.class.getResourceAsStream("/Readme.txt"); // OK
             String content = GetInputStream(is);
@@ -426,6 +414,13 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                 gd.addToSameRow();
                 gd.addNumericField("End LUT", lutRange[1]);
 
+                gd.addMessage("The graphs created have two new functions under the More... button:\n" +
+                        "The 'rescale LUT...' button allows you to rescale the LUT to different distance values or change the LUT altogether\n" +
+                        "The 'create Hist from selection' button allows you to create a detailed histogram of all points that lie within the selection\n" +
+                        "    this selection can be made using the box selection, freehand or polygon, as g as the area is enclosed.\n" +
+                        "These graphs are built on top of of ImageJ's graphs, but feature some untied ends, and thus not all buttons will work " +
+                        "on these graphs, and they will occasionally error, but these will not be fatal and can be ignored.");
+
                 gd.addHelp(content);
             }
 
@@ -476,21 +471,8 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                 lutRange[1] = (float) gd.getNextNumber();
             }
 
-            // Check if the chosen LUT can be set
-            if(visualisation) {
-                try {
-                    defaultLUT = colors[gd.getNextChoiceIndex()];
-                    ownColorTable.setLut(defaultLUT);
-                } catch (Exception e) {
-                    logService.info("Failed to set LUT.\nTrying Default: NCSA PalEdit/6_shades.lut");
-                    try {
-                        ownColorTable.setLut("NCSA PalEdit/6_shades.lut");
-                    } catch (Exception e2) {
-                        return false;
-                    }
 
-                }
-            }
+
         }
 
 
@@ -520,17 +502,6 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
     @Override
     public void run() {
 
-        ownColorTable = new OwnColorTable(lutService); // Instantiate colortable with our lutservice
-
-        // If we are doing a retry, we need to reset the colorTable
-        // Should (should) never fail since it succeeded before.
-        if (doingRetry) {
-            try {
-                ownColorTable.setLut(defaultLUT);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
 
         // Setup is done here
         // If it returns a failure (false) we execute nothing else
@@ -1192,37 +1163,30 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                             // Show a Plot with only the combined position for each row, reducing the amounts of points
                             // The color of each point is the distance between the 0th and 1st order, based on the selected LUT
 
-                            Plot distancePlot = new Plot("Distance", "x [" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "]", "y [" + unit_prefixes[unitsIndices[revOptionsIndices[3]]] + "]");
 
-                            for (int i = 0; i < halfOrderMatrix.rows; i++) {
-                                distancePlot.setColor(ownColorTable.getColor(halfOrderMatrix.get(i, 6), distRange[0], distRange[1]));
+                            CustomPlot distancePlot = new CustomPlot("Distance", "x [" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "]", "y [" + unit_prefixes[unitsIndices[revOptionsIndices[3]]] + "]", lutService, defaultLUT);
 
-                                distancePlot.add(shapes[0], toDouble(halfOrderMatrix.get(i, 2)), toDouble(halfOrderMatrix.get(i, 3))); // 3 4
-                            }
+                            distancePlot.add(shapes[0], toDouble(halfOrderMatrix.getColumn(2)), toDouble(halfOrderMatrix.getColumn(3)), toDouble(halfOrderMatrix.getColumn(6)), toDouble(distRange));
 
                             distancePlot.setLimitsToFit(true); // Ensure all points are visible
-                            addLutLegend(distancePlot, ownColorTable, "Distance", 512, distRange[0], distRange[1]); // Add the LUT as a legend
-                            distancePlot.show();
+                            distancePlot.addLutLegend("Distance", 512, distRange[0], distRange[1]); // Add the LUT as a legend
+                            distancePlot.showCustom();
                             distancePlot.setLimits(Float.NaN, Float.NaN, Float.NaN, Float.NaN); // Ensure all points are visible, again
 
-                            /*
+
                             {
-                                Plot distancePlot2 = new Plot("Distance2", "x [" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "]", "y [" + unit_prefixes[unitsIndices[revOptionsIndices[3]]] + "]");
+                                CustomPlot distancePlot2 = new CustomPlot("Distance2", "x [" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "]", "y [" + unit_prefixes[unitsIndices[revOptionsIndices[3]]] + "]", lutService, defaultLUT);
 
-                                for (int i = 0; i < finalPossibilities.rows; i++) {
-                                    distancePlot2.setColor(ownColorTable.getColor(finalPossibilities.get(i, 12), distRange[0], distRange[1]));
-
-                                    distancePlot2.add(shapes[0], toDouble(finalPossibilities.get(i, 3)), toDouble(finalPossibilities.get(i, 4))); // 3 4
-                                    distancePlot2.add(shapes[0], toDouble(finalPossibilities.get(i, 8)), toDouble(finalPossibilities.get(i, 9))); // 3 4
-
-                                }
-
+                                distancePlot2.add(shapes[0], toDouble(finalPossibilities.getColumn(3)), toDouble(finalPossibilities.getColumn(4)), toDouble(finalPossibilities.getColumn(12)), toDouble(distRange));
+                                distancePlot2.add(shapes[0], toDouble(finalPossibilities.getColumn(8)), toDouble(finalPossibilities.getColumn(9)), toDouble(finalPossibilities.getColumn(12)), toDouble(distRange));
                                 distancePlot2.setLimitsToFit(true); // Ensure all points are visible
-                                addLutLegend(distancePlot2, ownColorTable, "Distance", 512, distRange[0], distRange[1]); // Add the LUT as a legend
-                                distancePlot2.show();
+                                distancePlot2.addLutLegend("Distance", 512, distRange[0], distRange[1]); // Add the LUT as a legend
+                                distancePlot2.showCustom();
                                 distancePlot2.setLimits(Float.NaN, Float.NaN, Float.NaN, Float.NaN); // Ensure all points are visible, again
                             }
-                             */
+
+
+
                         }
 
                         if (saveSCV) {
@@ -1328,9 +1292,9 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
         // private final float[] angRange = {(float) (-1 * Math.PI), (float) (-0.95 * Math.PI) }; //more than and less than
         // private final float[] distRange = {1940, 2600}; //1800 3000 (1940, 2240)
 
-        debug_arg_string = "csv_in=F:\\ThesisData\\output\\combined_drift.csv csv_out=C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\testing visualisation=true";
+        //debug_arg_string = "csv_in=F:\\ThesisData\\output\\combined_drift.csv csv_out=C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\testing visualisation=true";
         // debug_arg_string = "csv_in=F:\\ThesisData\\output\\niels.csv csv_out=C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\testing order_number=2 visualisation=true";
-        // debug_arg_string = "csv_in=F:\\ThesisData\\Test3D\\localisations_drift.csv visualisation=true";
+        debug_arg_string = "csv_in=F:\\ThesisData\\output\\output3_drift.csv visualisation=true";
 
         //debug_arg_string = "";
         net.imagej.ImageJ ij = new ImageJ();

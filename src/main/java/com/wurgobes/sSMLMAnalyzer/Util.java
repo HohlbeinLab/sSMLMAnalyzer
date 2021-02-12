@@ -112,6 +112,14 @@ public class Util {
         return list.stream().mapToDouble(i->i).toArray();
     }
 
+    public static double[] toDouble(float[] v){
+        double[] result = new double[v.length];
+        for(int i = 0; i < v.length; i++)
+            result[i] = v[i];
+
+        return result;
+    }
+
     public static FloatMatrix extend(final FloatMatrix A, int rows, int columns){
         // extends a FloatMatrix with 0's to the size provided
         if(A.rows == rows && A.columns == columns) return A;
