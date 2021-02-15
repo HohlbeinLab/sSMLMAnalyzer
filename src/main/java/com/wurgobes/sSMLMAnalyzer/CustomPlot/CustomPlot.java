@@ -258,9 +258,9 @@ public class CustomPlot extends Plot implements Cloneable {
 
 	}
 
-	public void rescaleLUT(double[] newLimits, int width, String newLUTName){
+	public void rescaleLUT(String LUTTitle, double[] newLimits, int width, String newLUTName){
 		removeLutLegend();
-		addLutLegend(LUTLabel, width, newLimits[0], newLimits[1], newLUTName);
+		addLutLegend(LUTTitle, width, newLimits[0], newLimits[1], newLUTName);
 		updateImage();
 	}
 
@@ -315,6 +315,8 @@ public class CustomPlot extends Plot implements Cloneable {
 	public void addLutLegend(String label, int width, double start, double end){
 		addLutLegend(label, width, start, end, ownColorTable.currentLUT);
 	}
+
+
 
 	public void addLutLegend(String label, int width, double start, double end, String LUTColorLabel){
 		if(!LUTColorLabel.equals(ownColorTable.currentLUT)){
@@ -4076,6 +4078,9 @@ public class CustomPlot extends Plot implements Cloneable {
 		setFont(font);
 	}
 
+	public String getCurrentTitle() {
+		return LUTLabel;
+	}
 }
 
 /** This class contains the properties of the plot, such as size, format, range, etc, except for the data+format (plot contents).
