@@ -501,7 +501,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
 
     @Override
     public void run() {
-
+        boolean fileError = false;
 
         // Setup is done here
         // If it returns a failure (false) we execute nothing else
@@ -547,13 +547,15 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                     collumns = ownFloatMatrixLoader.getColumns();
                 } catch (IOException e) {
                     logService.info("File not found.");
+                    fileError = true;
                 } catch (LapackException e) {
                     logService.info("Lapack error");
-                    e.printStackTrace();
+                    fileError = true;
                 } catch (Exception e) {
                     logService.info("Error reading file. Does the csv start with a header?");
-                    e.printStackTrace();
+                    fileError = true;
                 }
+
 
 
                 // Initialise the units and header arrays
@@ -658,9 +660,11 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
             }
 
             // If we failed (and are processing) we report the error and stop execution
-            if ((!succes && processing) | floatMatrix == null){
+            if ((!succes && processing) | floatMatrix == null) {
                 if (distRange[0] > distRange[1]) {
                     logService.error("The distance had to be positive: " + distRange[0] + " is larger than " + distRange[1]);
+                } else if(fileError){
+                    logService.error("Could not load the file. Is the path correct?");
                 } else {
                     logService.error("No features were detected. Are there pairs in this sample?");
                 }
@@ -1166,24 +1170,26 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
 
                             CustomPlot distancePlot = new CustomPlot("Distance", "x [" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "]", "y [" + unit_prefixes[unitsIndices[revOptionsIndices[3]]] + "]", lutService, defaultLUT);
 
-                            distancePlot.add(shapes[0], toDouble(halfOrderMatrix.getColumn(2)), toDouble(halfOrderMatrix.getColumn(3)), toDouble(halfOrderMatrix.getColumn(6)), toDouble(distRange));
+                            distancePlot.add(shapes[0], toDouble(halfOrderMatrix.getColumn(2)), toDouble(halfOrderMatrix.getColumn(3)), toDouble(halfOrderMatrix.getColumn(6)));
 
                             distancePlot.setLimitsToFit(true); // Ensure all points are visible
-                            distancePlot.addLutLegend("Distance", 512, distRange[0], distRange[1]); // Add the LUT as a legend
-                            distancePlot.showCustom();
+                            distancePlot.setLUTLegend("Distance", 512, distRange[0], distRange[1]); // Add the LUT as a legend
                             distancePlot.setLimits(Float.NaN, Float.NaN, Float.NaN, Float.NaN); // Ensure all points are visible, again
+                            distancePlot.show();
 
 
+                            /*
                             {
                                 CustomPlot distancePlot2 = new CustomPlot("Distance2", "x [" + unit_prefixes[unitsIndices[revOptionsIndices[2]]] + "]", "y [" + unit_prefixes[unitsIndices[revOptionsIndices[3]]] + "]", lutService, defaultLUT);
 
-                                distancePlot2.add(shapes[0], toDouble(finalPossibilities.getColumn(3)), toDouble(finalPossibilities.getColumn(4)), toDouble(finalPossibilities.getColumn(12)), toDouble(distRange));
-                                distancePlot2.add(shapes[0], toDouble(finalPossibilities.getColumn(8)), toDouble(finalPossibilities.getColumn(9)), toDouble(finalPossibilities.getColumn(12)), toDouble(distRange));
+                                distancePlot2.add(shapes[0], toDouble(finalPossibilities.getColumn(3)), toDouble(finalPossibilities.getColumn(4)), toDouble(finalPossibilities.getColumn(12)));
+                                distancePlot2.add(shapes[0], toDouble(finalPossibilities.getColumn(8)), toDouble(finalPossibilities.getColumn(9)), toDouble(finalPossibilities.getColumn(12)));
                                 distancePlot2.setLimitsToFit(true); // Ensure all points are visible
-                                distancePlot2.addLutLegend("Distance", 512, distRange[0], distRange[1]); // Add the LUT as a legend
-                                distancePlot2.showCustom();
+                                distancePlot2.setLUTLegend("Distance", 512, distRange[0], distRange[1]); // Add the LUT as a legend
                                 distancePlot2.setLimits(Float.NaN, Float.NaN, Float.NaN, Float.NaN); // Ensure all points are visible, again
+                                distancePlot2.show();
                             }
+                             */
 
 
 
@@ -1294,7 +1300,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
 
         //debug_arg_string = "csv_in=F:\\ThesisData\\output\\combined_drift.csv csv_out=C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\testing visualisation=true";
         // debug_arg_string = "csv_in=F:\\ThesisData\\output\\niels.csv csv_out=C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\testing order_number=2 visualisation=true";
-        debug_arg_string = "csv_in=F:\\ThesisData\\output\\output3_drift.csv visualisation=true";
+        debug_arg_string = "csv_in=F:\\ThesisData\\output\\output3_drift.csv  angle_start=-0.11 angle_end=0.09 distance_start=1332 distance_end=2244 visualisation=true";
 
         //debug_arg_string = "";
         net.imagej.ImageJ ij = new ImageJ();

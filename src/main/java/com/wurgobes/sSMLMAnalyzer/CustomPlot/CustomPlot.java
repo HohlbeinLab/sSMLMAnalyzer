@@ -34,13 +34,9 @@ import net.imagej.lut.LUTService;
 public class CustomPlot extends Plot implements Cloneable {
 	public MenuItem[] menuItems = new MenuItem[22];
 	public OwnColorTable ownColorTable;
-	private String LUTLabel = "no label set";
-	private int LUTWidth = 512;
-	private double[] LUTLimits = new double[]{0f, 100f};
-	private int[] LUTIndex = new int[]{0, 0};
-	private boolean drawLUT = false;
 
-	private ArrayList<HistogramWindow> histwindows = new ArrayList<>();
+
+	private final ArrayList<HistogramWindow> histwindows = new ArrayList<>();
 
 	/** Text justification. */
 	public static final int LEFT=ImageProcessor.LEFT_JUSTIFY, CENTER=ImageProcessor.CENTER_JUSTIFY, RIGHT=ImageProcessor.RIGHT_JUSTIFY;
@@ -258,21 +254,8 @@ public class CustomPlot extends Plot implements Cloneable {
 
 	}
 
-	public void rescaleLUT(String LUTTitle, double[] newLimits, int width, String newLUTName){
-		removeLutLegend();
-		addLutLegend(LUTTitle, width, newLimits[0], newLimits[1], newLUTName);
-		updateImage();
-	}
-
-
-	private void removeLutLegend(){
-		for(int i = LUTIndex[0]; i < LUTIndex[1]; i++){
-			allPlotObjects.remove(LUTIndex[0]);
-		}
-	}
-
-	public double[] getLUTLimits(){
-		return LUTLimits;
+	public void removeLutLegend(){
+		pp.lut = null;
 	}
 
 	public void makeAreaHist(Roi roi){
@@ -281,7 +264,7 @@ public class CustomPlot extends Plot implements Cloneable {
 		PlotObject mainPlotObject = allPlotObjects.get(0);
 
 		if(mainPlotObject.type != PlotObject.XYZ_DATA) {
-			System.out.println("No z values to make a histogram out of");
+
 			return;
 		}
 
@@ -302,72 +285,97 @@ public class CustomPlot extends Plot implements Cloneable {
 
 		ImagePlus dummy = new ImagePlus(title, new FloatProcessor(new float[][]{arr}));
 
-		histwindows.add(new HistogramWindow(title, dummy, 256, LUTLimits[0], LUTLimits[1]));
+		histwindows.add(new HistogramWindow(title, dummy, 256, pp.lut.getLUTRange()[0], pp.lut.getLUTRange()[1]));
 		histwindows.get(histwindows.size()-1).getImagePlus().show();
 
 	}
 
-	public void addLutLegend(){
-		removeLutLegend();
-		addLutLegend(LUTLabel, LUTWidth, LUTLimits[0], LUTLimits[1], ownColorTable.currentLUT);
-	}
-
-	public void addLutLegend(String label, int width, double start, double end){
-		addLutLegend(label, width, start, end, ownColorTable.currentLUT);
-	}
 
 
+	private void drawLUTLegend(PlotObject lut){
+		int positionCode = lut.flags & LEGEND_POSITION_MASK;
+		if(positionCode == 0) return;
 
-	public void addLutLegend(String label, int width, double start, double end, String LUTColorLabel){
-		if(!LUTColorLabel.equals(ownColorTable.currentLUT)){
-			ownColorTable.setLut(LUTColorLabel);
+		String LUTLabel = lut.getLabel();
+		int LUTWidth = lut.getLUTWidth();
+		double [] LUTLimits = lut.getLUTRange();
+
+		int height = (int) (0.15 * frameHeight);
+		float calibratedWidth = 0.27f * frameWidth * ((float)LUTWidth/512);
+
+		int frameThickness = sc(lut.lineWidth > 0 ? lut.lineWidth : 1);
+
+
+		if (positionCode == AUTO_POSITION)
+			positionCode = autoLegendPosition(sc(calibratedWidth), height, frameThickness);
+
+		Rectangle rect = legendRect(positionCode, sc(calibratedWidth), height, frameThickness);
+
+
+		//debug rectangle
+		//ip.drawRect(rect.x, rect.y, rect.width, rect.height);
+
+		double calibratedX0 = 0.005 + (double) (rect.x - leftMargin)/ frameWidth;
+		double calibratedY0 = 0.08 + (double) (rect.y - topMargin)/ frameHeight;
+
+
+		ip.setFont(scFont(lut.getFont()));
+		if(!lut.getLUTColorLabel().equals(ownColorTable.getCurrentLUT())){
+			ownColorTable.setLut(lut.getLUTColorLabel());
 		}
-		LUTIndex[0] = allPlotObjects.size();
-		LUTLabel = label;
-		LUTWidth = width;
-		LUTLimits = new double[]{start, end};
-		drawLUT = true;
-
-
 		// Add a LUT legend to the provided plot with the provided start, end and title
 		//setLineWidth(0.05f);
-		for(int i = 0; i < width; i++){
-			setColor(ownColorTable.getColor(i, 0, width));
-			drawNormalizedLine(0.01 + 0.0005 * (i+2),0.93, 0.01 + 0.0005 * (i+2), 0.99);
+		for(int i = 0; i < LUTWidth; i++){
+			ip.setColor(ownColorTable.getColor(i, 0, LUTWidth));
+			drawNormalisedLineIP(calibratedX0 + 0.0005 * (i+2),calibratedY0-0.01, calibratedX0 + 0.0005 * (i+2), calibratedY0 + 0.05);
 		}
-		setColor("black");
-		drawNormalizedLine(0.01,0.925, 0.01, 0.995);
-		drawNormalizedLine(0.01 + 0.0005 * (width+2),0.925, 0.01 + 0.0005 * (width+2), 0.995);
-		drawNormalizedLine(0.011, 0.99, 0.01 + 0.0005 * (width+2), 0.99);
+		ip.setColor(lut.color);
 
-		double diff = end - start;
+		drawNormalisedLineIP(calibratedX0,calibratedY0 - 0.015 , calibratedX0, calibratedY0 + 0.055 );
+		drawNormalisedLineIP(calibratedX0 + 0.0005 * (LUTWidth+2),calibratedY0 - 0.015 , calibratedX0 + 0.0005 * (LUTWidth+2), calibratedY0 + 0.055);
+		drawNormalisedLineIP(calibratedX0 + 0.001, calibratedY0 + 0.05, calibratedX0 + 0.0005 * (LUTWidth+2), calibratedY0 + 0.05);
 
-		for(double i = start + 25; i < end; i += 25){
-			double w = ((i-start)/diff)*width;
-			drawNormalizedLine(0.01 + 0.0005 * (w+2), 0.986, 0.01 + 0.0005 * (w+2), 0.99);
-		}
+		double diff = LUTLimits[1] - LUTLimits[0];
 
-		for(double i = start + 50; i < end; i += 50){
-			double w = ((i-start)/diff)*width;
-			drawNormalizedLine(0.01 + 0.0005 * (w+2), 0.984, 0.01 + 0.0005 * (w+2), 0.99);
+		for(double i = LUTLimits[0] + 25; i < LUTLimits[1]; i += 25){
+			double w = ((i-LUTLimits[0])/diff)*LUTWidth;
+			drawNormalisedLineIP(calibratedX0 + 0.0005 * (w+2), calibratedY0 + 0.048 , calibratedX0+ 0.0005 * (w+2), calibratedY0 + 0.05);
 		}
 
-		for(double i = start + 100; i < end; i += 100){
-			double w = ((i-start)/diff)*width;
-			drawNormalizedLine(0.01 + 0.0005 * (w+2), 0.982, 0.01 + 0.0005 * (w+2), 0.99);
+		for(double i = LUTLimits[0] + 50; i < LUTLimits[1]; i += 50){
+			double w = ((i-LUTLimits[0])/diff)*LUTWidth;
+			drawNormalisedLineIP(calibratedX0 + 0.0005 * (w+2), calibratedY0 + 0.044, calibratedX0 + 0.0005 * (w+2), calibratedY0 + 0.05);
 		}
 
-		addLabel(0.001, 0.92, String.valueOf((int) start));
-		addLabel(0.001 + 0.00025 * (width-5), 0.92, label);
-		addLabel(0.001 + 0.0005 * (width+2), 0.92, String.valueOf((int) end));
+		for(double i = LUTLimits[0] + 100; i < LUTLimits[1]; i += 100){
+			double w = ((i-LUTLimits[0])/diff)*LUTWidth;
+			drawNormalisedLineIP(calibratedX0 + 0.0005 * (w+2), calibratedY0 + 0.042, calibratedX0 + 0.0005 * (w+2), calibratedY0 + 0.05);
+		}
 
-		LUTIndex[1] = allPlotObjects.size();
+		double offSet = (lut.getFont().getSize2D()/14) * -0.02; // offset for size of title
+		double offSet2 = (lut.getFont().getSize2D()/14) * -0.01 + (positionCode == TOP_RIGHT ? (630/(double)frameHeight) * -0.01 : 0); //ofset for scaling the entire image
+		drawString(String.valueOf((int) LUTLimits[0]),calibratedX0 - 0.009, calibratedY0 - 0.02);
+		drawString(LUTLabel, calibratedX0 + offSet - 0.009 + 0.00025 * (LUTWidth-5), calibratedY0 - 0.02);
+		drawString(String.valueOf((int) LUTLimits[1]), calibratedX0 + offSet2 + 0.0005 * (LUTWidth+2), calibratedY0 - 0.02);
 
 	}
 
-	public int getLUTWidth(){
-		return LUTWidth;
+	private void drawString(String text, double x, double y){
+		ip.drawString(text,
+				leftMargin + (int)(x*frameWidth),
+				topMargin + (int)(y*frameHeight));
 	}
+
+	private	void drawNormalisedLineIP(double x1, double y1, double x2, double y2){
+		ip.setClipRect(frame);
+		int ix1 = leftMargin + (int)(x1*frameWidth);
+		int iy1 = topMargin	 + (int)(y1*frameHeight);
+		int ix2 = leftMargin + (int)(x2*frameWidth);
+		int iy2 = topMargin	 + (int)(y2*frameHeight);
+		ip.drawLine(ix1, iy1, ix2, iy2);
+		ip.setClipRect(null);
+	}
+
 
 	/** Writes this plot into an OutputStream containing (1) the serialized PlotProperties and
 	 *	(2) the serialized Vector of all 'added' PlotObjects. The stream is NOT closed.
@@ -684,8 +692,10 @@ public class CustomPlot extends Plot implements Cloneable {
 	 *  In this special case, there will be no label for the axis on the CustomPlot.
 	 *	Call update() thereafter to make the change visible (if it is shown already). */
 	public void setXYLabels(String xLabel, String yLabel) {
-		//pp.xLabel.label = xLabel!=null ? xLabel : "";
-		//pp.yLabel.label = yLabel!=null ? yLabel : "";
+		if(pp != null) {
+			pp.xLabel.label = xLabel != null ? xLabel : "";
+			pp.yLabel.label = yLabel != null ? yLabel : "";
+		}
 	}
 
 	/** Sets the maximum number of intervals in a CustomPlot.
@@ -807,12 +817,12 @@ public class CustomPlot extends Plot implements Cloneable {
 	*/
 	public void add(String type, double[] xvalues, double[] yvalues) {
 		int iShape = toShape(type);
-		addPoints(Tools.toFloat(xvalues), Tools.toFloat(yvalues), null, iShape, iShape==CUSTOM?type.substring(5, type.length()):null);
+		addPoints(Tools.toFloat(xvalues), Tools.toFloat(yvalues), null, iShape, iShape==CUSTOM?type.substring(5):null);
 	}
 
-	public void add(String type, double[] xvalues, double[] yvalues, double[] zvalues, double[] lutlimits) {
+	public void add(String type, double[] xvalues, double[] yvalues, double[] zvalues) {
 		int iShape = toShape(type);
-		addPoints(Tools.toFloat(xvalues), Tools.toFloat(yvalues), Tools.toFloat(zvalues), null, iShape, iShape==CUSTOM?type.substring(5, type.length()):null, lutlimits);
+		addPoints(Tools.toFloat(xvalues), Tools.toFloat(yvalues), Tools.toFloat(zvalues), null, iShape, iShape==CUSTOM?type.substring(5):null);
 	}
 
 	/** Replaces the specified plot object (curve or set of points).
@@ -859,13 +869,13 @@ public class CustomPlot extends Plot implements Cloneable {
 		if (plotDrawn) updateImage();
 	}
 
-	public void addPoints(float[] xValues, float[] yValues, float[] zValues,float[] yErrorBars, int shape, String label, double[] lutlimits) {
+	public void addPoints(float[] xValues, float[] yValues, float[] zValues,float[] yErrorBars, int shape, String label) {
 		if (xValues==null || xValues.length==0) {
 			xValues = new float[yValues.length];
 			for (int i=0; i<yValues.length; i++)
 				xValues[i] = i;
 		}
-		this.LUTLimits = lutlimits;
+
 		if (objectToReplace>=0)
 			allPlotObjects.set(objectToReplace, new PlotObject(xValues, yValues, zValues,yErrorBars, shape, currentLineWidth, label));
 		else
@@ -1033,11 +1043,36 @@ public class CustomPlot extends Plot implements Cloneable {
 		allPlotObjects.add(new PlotObject(label, x, y, currentJustification, currentFont, currentColor, PlotObject.LABEL));
 	}
 
+
+	private int StringToFlags(String options){
+		int flags = 0;
+		if(options == null) options = "";
+		else options = options.toLowerCase();
+
+		if (options.contains("top-left"))
+			flags |= TOP_LEFT;
+		else if (options.contains("top-right"))
+			flags |= TOP_RIGHT;
+		else if (options.contains("bottom-left"))
+			flags |= BOTTOM_LEFT;
+		else if (options.contains("bottom-right"))
+			flags |= BOTTOM_RIGHT;
+		else if (!options.contains("off") && !options.contains("no"))
+			flags |= AUTO_POSITION;
+		if (options.contains("bottom-to-top"))
+			flags |= LEGEND_BOTTOM_UP;
+		if (options.contains("transparent"))
+			flags |= LEGEND_TRANSPARENT;
+
+
+		return flags;
+	}
+
 	/** Adds an automatically positioned legend, where 'labels' can be a tab-delimited or
-		newline-delimited list of curve or point labels in the sequence these data were added.
-		Hidden data sets are ignored.
-		If 'labels' is null or empty, the labels of the data set previously (if any) are used.
-		To modify the legend's style, call 'setFont' and 'setLineWidth' before 'addLegend'. */
+	 newline-delimited list of curve or point labels in the sequence these data were added.
+	 Hidden data sets are ignored.
+	 If 'labels' is null or empty, the labels of the data set previously (if any) are used.
+	 To modify the legend's style, call 'setFont' and 'setLineWidth' before 'addLegend'. */
 	public void addLegend(String labels) {
 		addLegend(labels, null);
 	}
@@ -1048,26 +1083,10 @@ public class CustomPlot extends Plot implements Cloneable {
 		If 'labels' is null or empty, the labels of the data set previously (if any) are used.
 		To modify the legend's style, call 'setFont' and 'setLineWidth' before 'addLegend'. */
 	public void addLegend(String labels, String options) {
-		int flags = 0;
-		if (options!=null) {
-			options = options.toLowerCase();
-			if (options.contains("top-left"))
-				flags |= CustomPlot.TOP_LEFT;
-			else if (options.contains("top-right"))
-				flags |= CustomPlot.TOP_RIGHT;
-			else if (options.contains("bottom-left"))
-				flags |= CustomPlot.BOTTOM_LEFT;
-			else if (options.contains("bottom-right"))
-				flags |= CustomPlot.BOTTOM_RIGHT;
-			else if (!options.contains("off") && !options.contains("no"))
-				flags |= CustomPlot.AUTO_POSITION;
-			if (options.contains("bottom-to-top"))
-				flags |= CustomPlot.LEGEND_BOTTOM_UP;
-			if (options.contains("transparent"))
-				flags |= CustomPlot.LEGEND_TRANSPARENT;
-		}
-		setLegend(labels, flags);
+		setLegend(labels, StringToFlags(options));
 	}
+
+
 
 	/** Adds a legend. The legend will be always drawn last (on top of everything).
 	 *	To modify the legend's style, call 'setFont' and 'setLineWidth' before 'addLegend'
@@ -1091,6 +1110,37 @@ public class CustomPlot extends Plot implements Cloneable {
 		}
 		pp.legend = new PlotObject(currentLineWidth == 0 ? 1 : currentLineWidth,
 				currentFont, currentColor == null ? Color.black : currentColor, flags);
+		if (plotDrawn) updateImage();
+	}
+
+	public void setLUTLegend(String currentTitle, int LUtWidth, double start, double end) {
+		setLUTLegend(currentTitle,  LUtWidth,  start,  end,  ownColorTable.getCurrentLUT(), null);
+	}
+
+	public void setLUTLegend(String currentTitle, double[] currentLUT, int currentLUTWidth, String currentLUTName) {
+		setLUTLegend(currentTitle,  currentLUTWidth,  currentLUT[0],  currentLUT[1],  currentLUTName, null);
+	}
+
+	public void setLUTLegend(String currentTitle, double[] currentLUT, int currentLUTWidth, String currentLUTName, int flags) {
+		setLUTLegend(currentTitle,  currentLUTWidth,  currentLUT[0],  currentLUT[1],  currentLUTName, flags);
+	}
+
+	public void setLUTLegend(String label, int width, double start, double end, String LUTColorLabel) {
+		setLUTLegend(label,  width,  start,  end,  LUTColorLabel, null);
+	}
+
+	public void setLUTLegend(String label, int width, double start, double end, String LUTColorLabel, String options) {
+		setLUTLegend( label,  width,  start,  end,  LUTColorLabel, StringToFlags(options));
+	}
+
+	public void setLUTLegend(String label, int width, double start, double end, String LUTColorLabel, int flags){
+		Font font = currentFont;
+		if(pp.lut != null){
+			font = pp.lut.getFont();
+		}
+		pp.lut = new PlotObject(label, width, start, end, LUTColorLabel, currentLineWidth == 0 ? 1 : currentLineWidth,
+				font, currentColor == null ? Color.black : currentColor, flags);
+
 		if (plotDrawn) updateImage();
 	}
 
@@ -1260,7 +1310,7 @@ public class CustomPlot extends Plot implements Cloneable {
 		return defaultFont;
 	}
 
-	/** Gets the font for xLabel ('x'), yLabel('y'), numbers ('f' for 'frame') or the legend ('l').
+	/** Gets the font for xLabel ('x'), yLabel('y'), numbers ('f' for 'frame'), the legend ('l')  or the lut ('u')
 	 *	Returns null if the given PlotObject does not exist or its font is null */
 	Font getFont(char c) {
 		PlotObject plotObject = pp.getPlotObject(c);
@@ -1270,14 +1320,14 @@ public class CustomPlot extends Plot implements Cloneable {
 			return null;
 	}
 
-	/** Sets the font for xLabel ('x'), yLabel('y'), numbers ('f' for 'frame') or the legend ('l') */
+	/** Sets the font for xLabel ('x'), yLabel('y'), numbers ('f' for 'frame'), the legend ('l')  or the lut ('u')*/
 	void setFont(char c, Font font) {
 		PlotObject plotObject = pp.getPlotObject(c);
 		if (plotObject != null)
 			plotObject.setFont(font);
 	}
 
-	/** Gets the label String of the xLabel ('x'), yLabel('y') or the legend ('l').
+	/** Gets the label String of the xLabel ('x'), yLabel('y'), the legend ('l')  or the lut ('u')*
 	 *	Returns null if the given PlotObject does not exist or its label is null */
 	public String getLabel(char c) {
 		PlotObject plotObject = pp.getPlotObject(c);
@@ -1477,7 +1527,7 @@ public class CustomPlot extends Plot implements Cloneable {
 		float lineWidth = plotObject.lineWidth;
 		if (items.length >= 3) try {
 			plotObject.lineWidth = Float.parseFloat(items[2].trim());
-		} catch (NumberFormatException e) {}
+		} catch (NumberFormatException ignored) {}
 		if (items.length >= 4 && plotObject.shape!=CUSTOM)
 			plotObject.shape = toShape(items[3].trim());
 		updateImage();
@@ -1517,7 +1567,7 @@ public class CustomPlot extends Plot implements Cloneable {
 	/** Creates a snapshot of the plot contents (not including axis formats etc),
 	 *  for later undo by restorePlotObjects. See also killPlotObjectsSnapshot */
 	public void savePlotObjects() {
-		allPlotObjectsSnapshot = new Vector<PlotObject>(allPlotObjects.size());
+		allPlotObjectsSnapshot = new Vector<>(allPlotObjects.size());
 		copyPlotObjectsVector(allPlotObjects, allPlotObjectsSnapshot);
 	}
 
@@ -1674,10 +1724,10 @@ public class CustomPlot extends Plot implements Cloneable {
 	 *  Also returns null in BatchMode. Note that the PlotWindow might get closed
 	 *  immediately if its 'listValues' and 'autoClose' flags are set.
 	 *  @see #update()
-	 * @return
+	 * @return CustomPlotWindow customplotwindow
 	 */
 
-	public CustomPlotWindow	showCustom() {
+	public CustomPlotWindow	show() {
 		PlotVirtualStack stack = getStack();
 		if (stack!=null) {
 			getImagePlus().show();
@@ -1742,6 +1792,7 @@ public class CustomPlot extends Plot implements Cloneable {
 	/** Draws the plot again, ignored if the plot has not been drawn before or the plot is frozen.
 	 *	If the ImagePlus exist, updates it and its calibration. */
 	public void updateImage() {
+
 		if (!plotDrawn || pp.isFrozen) return;
 		getBlankProcessor();
 		drawContents(ip);
@@ -1904,11 +1955,13 @@ public class CustomPlot extends Plot implements Cloneable {
 
 	/** Returns whether the plot requires color (not grayscale) */
 	boolean isColored() {
+		if(pp.lut != null)
+			return true;
 		for (PlotObject plotObject : allPlotObjects)
 			if (isColored(plotObject.color) || isColored(plotObject.color2))
 				return true;
 		for (PlotObject plotObject : pp.getAllPlotObjects())
-			if (plotObject != null && (isColored(plotObject.color) || isColored(plotObject.color2)))
+			if (plotObject != null && (isColored(plotObject.color) || isColored(plotObject.color2) || plotObject.type == PlotObject.XYZ_DATA))
 				return true;
 		return false;
 	}
@@ -1979,15 +2032,16 @@ public class CustomPlot extends Plot implements Cloneable {
 		if (pp.legend != null && (pp.legend.flags & LEGEND_POSITION_MASK) != 0)
 			drawPlotObject(pp.legend, ip);
 
-		if(drawLUT)
-			addLutLegend();
+		if(pp.lut != null)
+			drawPlotObject(pp.lut, ip);
+
 
 
 		plotDrawn = true;
 	}
 
 	/** Creates the processor if not existing, clears the background and prepares
-	 *	it for plotting. Also called by the PlotWindow class to prepare the window. */
+	 *	it for plotting. Also called by the PlotWind;ow class to prepare the window. */
 	ImageProcessor getBlankProcessor() {
 		makeMarginValues();
 		//IJ.log("CustomPlot.getBlankPr preferredH="+preferredPlotHeight+" pp.h="+pp.height);
@@ -2516,11 +2570,8 @@ public class CustomPlot extends Plot implements Cloneable {
 	/** Draws ticks, grid and axis label for each tick/grid line.
 	 *	The grid or major tick spacing in each direction is given by steps */
 	void drawAxesTicksGridNumbers(double[] steps) {
-
-
-		if (ip==null) {
+		if (ip==null)
 			return;
-		}
 
 		String[] xCats = labelsInBraces('x');   // create categories for the axes (if any)
 		String[] yCats = labelsInBraces('y');
@@ -2915,8 +2966,8 @@ public class CustomPlot extends Plot implements Cloneable {
 		Font smallFont = bigFont.deriveFont((float) (bigFont.getSize() * 0.7));
 
 		Rectangle bigBounds = box.getStringBounds(labelStr);
-		boolean doParse = (labelStr.indexOf("^^") >= 0 || labelStr.indexOf("!!") >= 0);
-		doParse = doParse && (labelStr.indexOf("^^^") < 0 && labelStr.indexOf("!!!") < 0);
+		boolean doParse = (labelStr.contains("^^") || labelStr.contains("!!"));
+		doParse = doParse && (!labelStr.contains("^^^") && !labelStr.contains("!!!"));
 		if (!doParse) {
 			box.drawString(labelStr, 0, y0);
 			Rectangle cropRect = new Rectangle(bigBounds);
@@ -3040,12 +3091,17 @@ public class CustomPlot extends Plot implements Cloneable {
 
 
 	private void drawPlotObject(PlotObject plotObject, ImageProcessor ip) {
+
 		//IJ.log("DRAWING type="+plotObject.type+" lineWidth="+plotObject.lineWidth+" shape="+plotObject.shape);
 		if (plotObject.hasFlag(PlotObject.HIDDEN)) return;
+
 		ip.setColor(plotObject.color);
 		ip.setLineWidth(sc(plotObject.lineWidth));
 		int type = plotObject.type;
 		switch (type) {
+			case PlotObject.LUT_LEGEND:
+				drawLUTLegend(plotObject);
+				break;
 			case PlotObject.XYZ_DATA:
 			case PlotObject.XY_DATA:
 				ip.setClipRect(frame);
@@ -3073,7 +3129,7 @@ public class CustomPlot extends Plot implements Cloneable {
 					for (int i=0; i<nPoints; i++)
 						if ((!logXAxis || plotObject.xValues[i]>0) && (!logYAxis || plotObject.yValues[i]>0)
 								&& !Double.isNaN(plotObject.xValues[i]) && !Double.isNaN(plotObject.yValues[i])) {
-							if(type == PlotObject.XYZ_DATA) ip.setColor(ownColorTable.getColor(plotObject.zValues[i], LUTLimits[0], LUTLimits[1]));
+							if(type == PlotObject.XYZ_DATA) ip.setColor(ownColorTable.getColor(plotObject.zValues[i], pp.lut.getLUTRange()));
 							fillShape(plotObject.shape, scaleX(plotObject.xValues[i]), scaleY(plotObject.yValues[i]), markSize);
 						}
 					ip.setColor(plotObject.color);
@@ -3095,7 +3151,7 @@ public class CustomPlot extends Plot implements Cloneable {
 						if ((!logXAxis || plotObject.xValues[i]>0) && (!logYAxis || plotObject.yValues[i]>0)
 						&& !Double.isNaN(plotObject.xValues[i]) && !Double.isNaN(plotObject.yValues[i])) {
 							if(type == PlotObject.XYZ_DATA) {
-								ip.setColor(ownColorTable.getColor(plotObject.zValues[i], LUTLimits[0], LUTLimits[1]));
+								ip.setColor(ownColorTable.getColor(plotObject.zValues[i], pp.lut.getLUTRange()));
 							}
 							drawShape(plotObject, scaleX(plotObject.xValues[i]), scaleY(plotObject.yValues[i]), markSize, i);
 						}
@@ -3388,8 +3444,8 @@ public class CustomPlot extends Plot implements Cloneable {
 					yVal = plotObject.yValues[pointIndex];
 				}
 				sb.append(";i="); sb.append(drawingLegend ? 0 : pointIndex);
-				sb.append(";xval=" + xVal);
-				sb.append(";yval=" + yVal);
+				sb.append(";xval=").append(xVal);
+				sb.append(";yval=").append(yVal);
 				sb.append(";");
 				sb.append(plotObject.macroCode);
 				if (!drawingLegend ||!sb.toString().contains("d2s") ) {// a graphical symbol won't contain "d2s" ..
@@ -3832,7 +3888,7 @@ public class CustomPlot extends Plot implements Cloneable {
 		PlotObject firstXYobject = null;
 		boolean allSameLength = true;
 		for (PlotObject plotObject : allPlotObjects) {
-			if (plotObject.type==PlotObject.XY_DATA) {
+			if (plotObject.type==PlotObject.XY_DATA || plotObject.type==PlotObject.XYZ_DATA) {
 				if (firstXYobject != null && firstXYobject.xValues.length!=plotObject.xValues.length) {
 					allSameLength = false;
 					break;
@@ -3843,7 +3899,7 @@ public class CustomPlot extends Plot implements Cloneable {
 		}
 		firstXYobject = null;
 		for (PlotObject plotObject : allPlotObjects) {
-			if (plotObject.type==PlotObject.XY_DATA) {
+			if (plotObject.type==PlotObject.XY_DATA || plotObject.type==PlotObject.XYZ_DATA) {
 				boolean sameX = firstXYobject!=null && Arrays.equals(firstXYobject.xValues, plotObject.xValues) && allSameLength;
 				boolean sameXY = sameX && Arrays.equals(firstXYobject.yValues, plotObject.yValues); //ignore duplicates (e.g. Markers plus Curve)
 				boolean writeX = firstXYobject==null ? writeFirstXColumn : !sameX;
@@ -4078,9 +4134,8 @@ public class CustomPlot extends Plot implements Cloneable {
 		setFont(font);
 	}
 
-	public String getCurrentTitle() {
-		return LUTLabel;
-	}
+
+
 }
 
 /** This class contains the properties of the plot, such as size, format, range, etc, except for the data+format (plot contents).
@@ -4095,6 +4150,7 @@ class PlotProperties implements Cloneable, Serializable {
 	PlotObject xLabel = new PlotObject(PlotObject.AXIS_LABEL);		//the x axis label (string & font)
 	PlotObject yLabel = new PlotObject(PlotObject.AXIS_LABEL);		//the x axis label (string & font)
 	PlotObject legend;												//the legend (if any)
+	PlotObject lut;
 	int width = 0;													//canvas width (note: when stored, this must fit the image)
 	int height = 0;
 	int axisFlags;													//these define axis layout
@@ -4104,7 +4160,7 @@ class PlotProperties implements Cloneable, Serializable {
 
 	/** Returns an array of all PlotObjects defined as PlotProperties. Note that some may be null */
 	PlotObject[] getAllPlotObjects() {
-		return new PlotObject[]{frame, xLabel, xLabel, legend};
+		return new PlotObject[]{frame, xLabel, xLabel, legend, lut};
 	}
 
 	/** Returns the PlotObject for xLabel ('x'), yLabel('y'), frame ('f'; includes number font) or the legend ('l'). */
@@ -4114,6 +4170,7 @@ class PlotProperties implements Cloneable, Serializable {
 			case 'y':  return yLabel;
 			case 'f':  return frame;
 			case 'l':  return legend;
+			case 'u':  return lut;
 			default:   return null;
 		}
 	}
@@ -4152,7 +4209,7 @@ class PlotObject implements Cloneable, Serializable {
 	static final long serialVersionUID = 1L;
 	/** Constants for the type of objects. These are powers of two so one can use them as masks */
 	public final static int XY_DATA = 1, ARROWS = 2, LINE = 4, NORMALIZED_LINE = 8, DOTTED_LINE = 16,
-			LABEL = 32, NORMALIZED_LABEL = 64, LEGEND = 128, AXIS_LABEL = 256, FRAME = 512, SHAPES = 1024, XYZ_DATA = 2048;
+			LABEL = 32, NORMALIZED_LABEL = 64, LEGEND = 128, AXIS_LABEL = 256, FRAME = 512, SHAPES = 1024, XYZ_DATA = 2048, LUT_LEGEND = 4096;
 	/** mask for recovering font style from the flags */
 	final static int FONT_STYLE_MASK = 0x0f;
 	/** flag for the data set passed with the constructor. Note that 0 to 0x0f are reserved for fonts modifiers, 0x010-0x800 are reserved for legend modifiers */
@@ -4193,16 +4250,37 @@ class PlotObject implements Cloneable, Serializable {
 	public int justification;
 	/** Macro code for drawing symbols */
 	public String macroCode;
+
 	/** Text objects (labels, legend, axis labels) only: the font; maybe null for default. This is not serialized (transient) */
 	private transient Font font;
 	/** String for representation of the font family (for Serialization); may be null for default. Font style is in flags, font size in fontSize. */
 	private String fontFamily;
 	/** Font size (for Serialization), for 'normal' plots (for high-resolution plots, to be multiplied by a scale factor) */
-	private float fontSize;
+	public float fontSize;
+
+	private int LUTWidth;
+	private String LUTColorLabel;
+
 
 	/** Generic constructor */
 	PlotObject(int type) {
 		this.type = type;
+	}
+
+
+	/** Constructor for LUT_LEGEND */
+	PlotObject(String label, int width, double start, double end, String LUTColorLabel, float lineWidth, Font font, Color color, int flags) {
+		this.type = LUT_LEGEND;
+		this.label = label;
+		this.x = start;
+		this.y = end;
+		this.LUTColorLabel = LUTColorLabel;
+		this.LUTWidth = width;
+
+		this.lineWidth = lineWidth;
+		this.font = font;
+		this.color = color;
+		this.flags = flags;
 	}
 
 	/** Constructor for XY_DATA, i.e., a curve or set of points */
@@ -4369,6 +4447,23 @@ class PlotObject implements Cloneable, Serializable {
 		}
 	}
 
+	String getLabel() {
+		return label;
+	}
+
+	int getLUTWidth() {
+		return LUTWidth;
+	}
+
+	double[] getLUTRange() {
+		return new double[] {x, y};
+	}
+
+	String getLUTColorLabel(){
+		return LUTColorLabel;
+	}
+
+
 	/** A deep clone, which duplicates arrays etc.
 	 *  Note that colors & font are not cloned; it is assumed that these wil not be modified but replaced,
 	 *  so the clone remains unaffected */
@@ -4398,13 +4493,16 @@ class PlotObject implements Cloneable, Serializable {
 		return dest;
 	}
 
+
+
 	/** Converts old (pre-1.52i) type codes for the PlotObjects to the new ones, which can be used as masks */
 	void updateType() {
 		type = 1<<type;
 	}
 
 	public String toString() {  //for debug messages
-		String s = "PlotObject type="+type+" flags="+flags+" xV:"+(xValues==null ? "-":yValues.length)+" yV:"+(yValues==null ? "-":yValues.length)+" label="+label+" col="+color+" fSize="+fontSize+" ff="+fontFamily;
-		return s;
+		return "PlotObject type="+type+" flags="+flags+" xV:"+(xValues==null ? "-":yValues.length)+" yV:"+(yValues==null ? "-":yValues.length)+" label="+label+" col="+color+" fSize="+fontSize+" ff="+fontFamily;
 	}
+
+
 } // class PlotObject

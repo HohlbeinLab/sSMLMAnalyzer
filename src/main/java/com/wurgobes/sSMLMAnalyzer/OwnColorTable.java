@@ -20,7 +20,7 @@ public class OwnColorTable{
     private final LUTService ls;
     private boolean shownFailure = false;
 
-    public String currentLUT;
+    private String currentLUT;
 
     public OwnColorTable(LUTService ls){
         this.ls = ls;
@@ -65,6 +65,7 @@ public class OwnColorTable{
 
     public Color getColor(float value, double min, double max){
         int v = (int)(Math.max(Math.min((value - min)/(max - min), 1), 0) * (CT.length-1)); //remap from 0 to number of lut colors
+
         return CT[v];
     }
 
@@ -72,4 +73,9 @@ public class OwnColorTable{
         return ls.findLUTs().keySet().toArray(new String[0]);
     }
 
+    public String getCurrentLUT(){return currentLUT;}
+
+    public Color getColor(float zValue, double[] lutRange) {
+        return getColor(zValue, lutRange[0], lutRange[1]);
+    }
 }

@@ -52,19 +52,14 @@ public class CustomPlotDialog implements DialogListener {
     //saved dialog options: Use Template
     private static int templateID;
     private static int lastTemplateFlags = CustomPlot.COPY_AXIS_STYLE|CustomPlot.COPY_CONTENTS_STYLE;
-    // rescale LUT
+    // change LUT
     private double[] currentLUT;
     private int currentLUTWidth = 512;
     private String currentLUTName;
     private OwnColorTable ownColorTable;
     private String[] colors;
     private String currentTitle;
-
-    // Used in case rescale lut is cancelled
-    private String defaultLUTName;
-    private String defaultLUTTitle;
-    private double[] defaultLUT;
-    private int defaultLUTWidth;
+    private int lutPosNumber = 0;
 
     /** Constructs a new PlotDialog for a given plot and sets the type of dialog */
     public CustomPlotDialog(CustomPlot plot, int dialogType) {
@@ -105,9 +100,6 @@ public class CustomPlotDialog implements DialogListener {
             plot.restorePlotProperties();
             if (dialogType == TEMPLATE)
                 plot.restorePlotObjects();
-            else if(dialogType == LUT_CHANGE){
-                plot.rescaleLUT(defaultLUTTitle, defaultLUT, defaultLUTWidth, defaultLUTName);
-            }
 
             plot.update();
         } else {
@@ -124,7 +116,8 @@ public class CustomPlotDialog implements DialogListener {
             if (dialogType == TEMPLATE)
                 lastTemplateFlags = plot.templateFlags;
             if (dialogType == LUT_CHANGE)
-                plot.rescaleLUT(currentTitle, currentLUT, currentLUTWidth, currentLUTName);
+                plot.setLUTLegend(currentTitle, currentLUT, currentLUTWidth, currentLUTName, LEGEND_POSITION_N[lutPosNumber]);
+
 
         }
         plot.killPlotPropertiesSnapshot();
@@ -147,18 +140,6 @@ public class CustomPlotDialog implements DialogListener {
      *  @return false on error */
     private boolean setupDialog(GenericDialog gd) {
         double[] currentMinMax = plot.getLimits();
-        if(dialogType == LUT_CHANGE) {
-            currentLUT = plot.getLUTLimits();
-            currentLUTName = ownColorTable.currentLUT;
-            currentLUTWidth = plot.getLUTWidth();
-            currentTitle = plot.getCurrentTitle();
-
-            defaultLUTName = currentLUTName;
-            defaultLUT = currentLUT;
-            defaultLUTTitle = currentTitle;
-            defaultLUTWidth = currentLUTWidth;
-        }
-
         boolean livePlot = plot.plotMaker != null;
 
         int xDigits = plot.logXAxis ? -2 : CustomPlot.getDigits(currentMinMax[0], currentMinMax[1], 0.005*Math.abs(currentMinMax[1]- currentMinMax[0]), 6, 0);
@@ -176,6 +157,21 @@ public class CustomPlotDialog implements DialogListener {
         int yDigits = plot.logYAxis ? -2 : CustomPlot.getDigits(currentMinMax[2], currentMinMax[3], 0.005*Math.abs(currentMinMax[3]- currentMinMax[2]), 6, 0);
 
         if(dialogType == LUT_CHANGE){
+            Font lutFont = plot.getFont('u');
+            currentLUT = plot.pp.lut.getLUTRange();
+            currentLUTName = ownColorTable.getCurrentLUT();
+            currentLUTWidth = plot.pp.lut.getLUTWidth();
+            currentTitle = plot.pp.lut.getLabel();
+
+            int lFlags = plot.getObjectFlags('u');
+            if (lFlags != -1) { //if we have a legend already
+                for (int i=0; i<LEGEND_POSITION_N.length; i++)  //determine the position option from the flags
+                    if ((lFlags & CustomPlot.LEGEND_POSITION_MASK) == LEGEND_POSITION_N[i]) {
+                        lutPosNumber = i;
+                        break;
+                    }
+            }
+
             gd.setInsets(20, 0, 3); //top, left, bottom
             gd.addStringField("Title of LUT", currentTitle);
             gd.addMessage("Range of LUT");
@@ -184,7 +180,10 @@ public class CustomPlotDialog implements DialogListener {
             gd.addNumericField("To", currentLUT[1]);
             gd.addMessage("Width of LUT (px)");
             gd.addNumericField("width", currentLUTWidth);
-            gd.addChoice("LUT", colors, ownColorTable.currentLUT);
+            gd.addChoice("LUT", colors, ownColorTable.getCurrentLUT());
+
+            gd.addChoice("Legend position", LEGEND_POSITIONS, LEGEND_POSITIONS[lutPosNumber]);
+            gd.addNumericField("Font Size", lutFont.getSize2D(), 1);
         }
 
         if (dialogType == SET_RANGE || dialogType == Y_AXIS) {
@@ -351,13 +350,26 @@ public class CustomPlotDialog implements DialogListener {
         boolean livePlot = plot.plotMaker != null;
 
         if(dialogType == LUT_CHANGE){
+            Font lutFont = plot.getFont('u');
+
             currentTitle = gd.getNextString();
             currentLUT[0] = gd.getNextNumber();
             currentLUT[1] = gd.getNextNumber();
             currentLUTWidth = (int) gd.getNextNumber();
             currentLUTName = colors[gd.getNextChoiceIndex()];
 
-            plot.rescaleLUT(currentTitle,currentLUT, currentLUTWidth, currentLUTName);
+
+            lutPosNumber = gd.getNextChoiceIndex();
+            int lFlags = LEGEND_POSITION_N[lutPosNumber];
+
+            float lutFontSize = (float)gd.getNextNumber();
+            if (gd.invalidNumber()) lutFontSize = lutFont.getSize2D();
+            if (lutFontSize < 9)  lutFontSize = 9f;
+            if (lutFontSize > 24) lutFontSize = 24f;
+
+            plot.setFont('u', lutFont.deriveFont(lutFont.getStyle(), lutFontSize));
+
+            plot.setLUTLegend(currentTitle,currentLUT, currentLUTWidth, currentLUTName, lFlags);
         }
 
         if (dialogType == SET_RANGE || dialogType == X_AXIS) {

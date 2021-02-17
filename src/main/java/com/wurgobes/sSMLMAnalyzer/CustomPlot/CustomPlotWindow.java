@@ -113,36 +113,6 @@ public class CustomPlotWindow extends PlotWindow {
     }
 
 
-
-    /**
-     * @deprecated
-     * replaced by the Plot class.
-     */
-    //public CustomPlotWindow(String title, String xLabel, String yLabel, float[] xValues, float[] yValues) {
-    //    super(createImage(title, xLabel, yLabel, xValues, yValues));
-    //    plot = staticPlot;
-    //    ((PlotCanvas)getCanvas()).setPlot(plot);
-    //}
-
-    /**
-     * @deprecated
-     * replaced by the Plot class.
-     */
-    //public CustomPlotWindow(String title, String xLabel, String yLabel, double[] xValues, double[] yValues) {
-    //    this(title, xLabel, yLabel, Tools.toFloat(xValues), Tools.toFloat(yValues));
-    //}
-
-    /** Creates a PlotWindow from a given ImagePlus with a Plot object.
-     *  (called when reading an ImagePlus with an associated plot from a file) */
-
-   // public CustomPlotWindow(ImagePlus imp, CustomPlot plot) {
-   //     super(imp);
-   //     ((PlotCanvas)getCanvas()).setPlot(plot);
-   //     this.plot = plot;
-   //     draw();
-   // }
-
-
     CustomPlotWindow(CustomPlot plot){
         super(plot.getImagePlus(), plot);
         super.setPlot(plot);
@@ -384,7 +354,7 @@ public class CustomPlotWindow extends PlotWindow {
         morePopupMenu.addSeparator();
         menuItems[PROFILE_PLOT_OPTIONS] = addPopupItem(morePopupMenu, "Plot Defaults...");
         morePopupMenu.addSeparator();
-        menuItems[RESCALE_LUT] = addPopupItem(morePopupMenu, "Rescale LUT...");
+        menuItems[RESCALE_LUT] = addPopupItem(morePopupMenu, "Change LUT...");
         menuItems[AREA_HIST] = addPopupItem(morePopupMenu, "Create Hist from selection");
         return morePopupMenu;
     }
@@ -474,9 +444,6 @@ public class CustomPlotWindow extends PlotWindow {
                 } else {
                    plotCustom.makeAreaHist(roi);
                 }
-
-            } else {
-                System.out.println("dont see this");
             }
 
             ic.requestFocus();	//have focus on the canvas, not the button, so that pressing the space bar allows panning
