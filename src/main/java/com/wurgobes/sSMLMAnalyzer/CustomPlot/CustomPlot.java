@@ -305,7 +305,6 @@ public class CustomPlot extends Plot implements Cloneable {
 
 		int frameThickness = sc(lut.lineWidth > 0 ? lut.lineWidth : 1);
 
-
 		if (positionCode == AUTO_POSITION)
 			positionCode = autoLegendPosition(sc(calibratedWidth), height, frameThickness);
 
@@ -315,6 +314,7 @@ public class CustomPlot extends Plot implements Cloneable {
 		//debug rectangle
 		//ip.drawRect(rect.x, rect.y, rect.width, rect.height);
 
+		//This is to position the lut in its entirity properly within the box provided by @legendRect()
 		double calibratedX0 = 0.005 + (double) (rect.x - leftMargin)/ frameWidth;
 		double calibratedY0 = 0.08 + (double) (rect.y - topMargin)/ frameHeight;
 
@@ -331,7 +331,7 @@ public class CustomPlot extends Plot implements Cloneable {
 		}
 		ip.setColor(lut.color);
 
-		drawNormalisedLineIP(calibratedX0,calibratedY0 - 0.015 , calibratedX0, calibratedY0 + 0.055 );
+		drawNormalisedLineIP(calibratedX0 + 0.001,calibratedY0 - 0.015 , calibratedX0 + 0.001, calibratedY0 + 0.055 );
 		drawNormalisedLineIP(calibratedX0 + 0.0005 * (LUTWidth+2),calibratedY0 - 0.015 , calibratedX0 + 0.0005 * (LUTWidth+2), calibratedY0 + 0.055);
 		drawNormalisedLineIP(calibratedX0 + 0.001, calibratedY0 + 0.05, calibratedX0 + 0.0005 * (LUTWidth+2), calibratedY0 + 0.05);
 
