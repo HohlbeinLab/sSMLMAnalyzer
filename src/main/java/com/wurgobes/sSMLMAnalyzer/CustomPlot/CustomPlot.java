@@ -845,7 +845,7 @@ public class CustomPlot extends Plot implements Cloneable {
 		else if (iShape==-2)
 			addHorizontalErrorBars(yvalues);
 		else
-			addPoints(null, Tools.toFloat(yvalues), null, iShape, iShape==CUSTOM?type.substring(5, type.length()):null);
+			addPoints(null, Tools.toFloat(yvalues), null, iShape, iShape==CUSTOM?type.substring(5):null);
 	}
 
 	/** Adds a set of points to the plot or adds a curve if shape is set to LINE.
@@ -901,15 +901,13 @@ public class CustomPlot extends Plot implements Cloneable {
 	/** Returns the number for a given plot symbol shape, -1 for xError and -2 for yError (all case-insensitive) */
 	public static int toShape(String str) {
 		str = str.toLowerCase(Locale.US);
-		int shape = CustomPlot.CIRCLE;
+		int shape;
 		if (str.contains("curve") || str.contains("line"))
 			shape = CustomPlot.LINE;
 		else if (str.contains("connected"))
 			shape = CustomPlot.CONNECTED_CIRCLES;
 		else if (str.contains("filled"))
 			shape = CustomPlot.FILLED;
-		else if (str.contains("circle"))
-			shape = CustomPlot.CIRCLE;
 		else if (str.contains("box"))
 			shape = CustomPlot.BOX;
 		else if (str.contains("triangle"))
@@ -930,8 +928,11 @@ public class CustomPlot extends Plot implements Cloneable {
 			shape = CustomPlot.SEPARATED_BAR;
 		else if (str.contains("bar"))
 			shape = CustomPlot.BAR;
-		if (str.startsWith("code:"))
+		else if (str.startsWith("code:"))
 			shape = CUSTOM;
+		else // default ("circle")
+			shape = CustomPlot.CIRCLE;
+
 		return shape;
 	}
 
@@ -978,11 +979,11 @@ public class CustomPlot extends Plot implements Cloneable {
 
 	/**
 	 * Adds a set of 'shapes' such as boxes and whiskers
-	 *
-	 * @param shapeType e.g. "boxes width=20"
+	 *  @param shapeType e.g. "boxes width=20"
 	 * @param floatCoords eg[6][3] holding 1 Xval + 5 Yvals for 3 boxes
 	 */
 	public void drawShapes(String shapeType, ArrayList floatCoords) {
+
 		allPlotObjects.add(new PlotObject(shapeType, floatCoords, currentLineWidth, currentColor, currentColor2));
 	}
 
@@ -1467,8 +1468,7 @@ public class CustomPlot extends Plot implements Cloneable {
 		PlotObject plotObject = plot.getPlotObjectDeepClone(i);
 		plotObject.unsetFlag(PlotObject.CONSTRUCTOR_DATA);
 		allPlotObjects.add(plotObject);
-		int index = allPlotObjects.size() - 1;
-		return index;
+		return allPlotObjects.size() - 1;
 	}
 
 	/** Get the style of the i-th PlotObject (curve, label, ...) in the sequence
@@ -1524,7 +1524,6 @@ public class CustomPlot extends Plot implements Cloneable {
 			plotObject.unsetFlag(PlotObject.HIDDEN);
 		plotObject.color = Colors.decode(items[0].trim(), plotObject.color);
 		plotObject.color2 = Colors.decode(items[1].trim(), null);
-		float lineWidth = plotObject.lineWidth;
 		if (items.length >= 3) try {
 			plotObject.lineWidth = Float.parseFloat(items[2].trim());
 		} catch (NumberFormatException ignored) {}
@@ -1651,13 +1650,11 @@ public class CustomPlot extends Plot implements Cloneable {
 	 *	If an ImagePlus for this plot already exists, displays the plot in that ImagePlus and returns it. */
 	public ImagePlus getImagePlus() {
 		if (stack != null) {
-			if (imp != null)
-				return imp;
-			else {
+			if (imp == null) {
 				imp = new ImagePlus(title, stack);
 				adjustCalibration(imp.getCalibration());
-				return imp;
 			}
+			return imp;
 		}
 		if (plotDrawn)
 			updateImage();
@@ -1816,7 +1813,7 @@ public class CustomPlot extends Plot implements Cloneable {
 	/** Creates a new high-resolution plot by scaling it and displays that plot if showIt is true.
 	 *	<code>title</code> may be null, then a default title is used. */
 	public ImagePlus makeHighResolution(String title, float scale, boolean antialiasedText, boolean showIt) {
-		CustomPlot hiresPlot = null;
+		CustomPlot hiresPlot;
 		try {
 			hiresPlot = (CustomPlot) clone();	//shallow clone, thus arrays&objects are not cloned, but they will be used only now
 		} catch (Exception e) {return null;}
@@ -2352,11 +2349,12 @@ public class CustomPlot extends Plot implements Cloneable {
 				v1 -= errorBars[i];
 				v2 += errorBars[i];
 			}
+			final boolean enlargeRangeYes = suggestedEnlarge == 0 && ((i > 0 && i < data.length - 1) || v2 != v1);
 			if (v1 < allMinAndMax[minIndex]) {
 				allMinAndMax[minIndex] = v1;
 				nMinEqual = 1;
 				enlargeRange[minIndex] = suggestedEnlarge;
-				if (suggestedEnlarge == 0 && ((i>0 && i<data.length-1) || v2 != v1)) //for lines except at the end: also enlarge
+				if (enlargeRangeYes) //for lines except at the end: also enlarge
 					enlargeRange[minIndex] = USUALLY_ENLARGE;
 			} else if (v1 == allMinAndMax[minIndex])
 				nMinEqual++;
@@ -2364,7 +2362,7 @@ public class CustomPlot extends Plot implements Cloneable {
 				allMinAndMax[maxIndex] = v2;
 				nMaxEqual = 1;
 				enlargeRange[maxIndex] = suggestedEnlarge;
-				if (suggestedEnlarge == 0 && ((i>0 && i<data.length-1) || v2 != v1)) //for lines except at the end: also enlarge
+				if (enlargeRangeYes) //for lines except at the end: also enlarge
 					enlargeRange[maxIndex] = USUALLY_ENLARGE;
 			} else if (v2 == allMinAndMax[maxIndex])
 				nMaxEqual++;
@@ -2763,7 +2761,7 @@ public class CustomPlot extends Plot implements Cloneable {
 						drawLine(x2, y, x2-sc(tickLength), y);
 					}
 					if (hasFlag(Y_NUMBERS)) {
-						int w = 0;
+						int w;
 						if (logYAxis || digits<0) {
 							w = drawExpString(logYAxis ? Math.pow(10,v) : v, logYAxis ? -1 : -digits,
 									xNumberRight, y, RIGHT, fontAscent, baseFont, scFontSmall, multiplySymbol);
@@ -2873,8 +2871,7 @@ public class CustomPlot extends Plot implements Cloneable {
 		String s = getLabel(labelCode);
 		if (s.startsWith("{") && s.endsWith("}")) {
 			String inBraces = s.substring(1, s.length() - 1);
-			String[] catLabels = inBraces.split(",");
-			return catLabels;
+			return inBraces.split(",");
 		} else {
 			return null;
 		}
@@ -2997,10 +2994,10 @@ public class CustomPlot extends Plot implements Cloneable {
 		int nTags = 0;
 
 		for (int jj = 0; jj < len - 2; jj++) {//get positions where font size changes
-			if (labelStr.substring(jj, jj + 2).equals("^^")) {
+			if (labelStr.startsWith("^^", jj)) {
 				tags[nTags++] = jj;
 			}
-			if (labelStr.substring(jj, jj + 2).equals("!!")) {
+			if (labelStr.startsWith("!!", jj)) {
 				tags[nTags++] = -jj;
 			}
 		}
@@ -3009,7 +3006,7 @@ public class CustomPlot extends Plot implements Cloneable {
 
 		int leftIndex = 0;
 		int xRight = 0;
-		int y2 = y0;
+		int y2;
 
 		boolean subscript = labelStr.startsWith("!!");
 		for (int pp = 0; pp < tags.length; pp++) {//draw all text fragments
@@ -3192,7 +3189,7 @@ public class CustomPlot extends Plot implements Cloneable {
 					int nShapes = plotObject.shapeData.size();
 
 					for (int i = 0; i < nShapes; i++) {
-						float[] corners = (float[])(plotObject.shapeData.get(i));
+						float[] corners = plotObject.shapeData.get(i);
 						int x1 = scaleX(corners[0]);
 						int y1 = scaleY(corners[1]);
 						int x2 = scaleX(corners[2]);
@@ -3233,10 +3230,10 @@ public class CustomPlot extends Plot implements Cloneable {
 					}
 					boolean horizontal = shType.contains("boxesx");
 					int nShapes = plotObject.shapeData.size();
-					int halfWidth = Math.round(sc(iBoxWidth / 2));
+					int halfWidth = Math.round(sc((float)iBoxWidth / 2));
 					for (int i = 0; i < nShapes; i++) {
 
-						float[] coords = (float[])(plotObject.shapeData.get(i));
+						float[] coords = plotObject.shapeData.get(i);
 
 						if (!horizontal) {
 
@@ -3387,10 +3384,10 @@ public class CustomPlot extends Plot implements Cloneable {
 	void drawShape(PlotObject plotObject, int x, int y, int size, int pointIndex) {
 		int shape = plotObject.shape;
 		if (shape == DIAMOND) size = (int)(size*1.21);
-		int xbase = x-sc(size/2);
-		int ybase = y-sc(size/2);
-		int xend = x+sc(size/2);
-		int yend = y+sc(size/2);
+		int xbase = x-sc((float)size/2);
+		int ybase = y-sc((float)size/2);
+		int xend = x+sc((float)size/2);
+		int yend = y+sc((float)size/2);
 		if (ip==null) {
 			return;
 		}
@@ -3473,7 +3470,7 @@ public class CustomPlot extends Plot implements Cloneable {
 	 *	Note that ip.fill, ip.fillOval etc. can't be used here: they do not care about the clip rectangle */
 	void fillShape(int shape, int x0, int y0, int size) {
 		if (shape == DIAMOND) size = (int)(size*1.21);
-		int r = sc(size/2)-1;
+		int r = sc((float)size/2)-1;
 		switch(shape) {
 			case BOX:
 				for (int dy=-r; dy<=r; dy++)
@@ -3483,7 +3480,7 @@ public class CustomPlot extends Plot implements Cloneable {
 			case TRIANGLE:
 				int ybase = y0 - r - sc(1);
 				int yend = y0 + r;
-				double halfWidth = sc(size/2)+sc(1)-1;
+				double halfWidth = sc((float)size/2)+sc(1)-1;
 				double hwStep = halfWidth/(yend-ybase+1);
 				for (int y=yend; y>=ybase; y--, halfWidth -= hwStep) {
 					int dx = (int)(Math.round(halfWidth));
@@ -3494,7 +3491,7 @@ public class CustomPlot extends Plot implements Cloneable {
 			case DIAMOND:
 				ybase = y0 - r - sc(1);
 				yend = y0 + r;
-				halfWidth = sc(size/2)+sc(1)-1;
+				halfWidth = sc((float)size/2)+sc(1)-1;
 				hwStep = halfWidth/(yend-ybase+1);
 				for (int y=yend; y>=ybase; y--) {
 					int dx = (int)(Math.round(halfWidth-(hwStep+1)*Math.abs(y-y0)));
@@ -3546,8 +3543,6 @@ public class CustomPlot extends Plot implements Cloneable {
 
 	private void drawHorizontalErrorBars(float[] x, float[] y, float[] e) {
 		int nPoints = Math.min(Math.min(x.length, y.length), e.length);
-		float[] xpoints = new float[2];
-		float[] ypoints = new float[2];
 		for (int i=0; i<nPoints; i++) {
 			if (Float.isNaN(x[i]) || Float.isNaN(y[i]) || (logXAxis && !(y[i] >0))) continue;
 			int y0 = scaleY(y[i]);
@@ -3713,7 +3708,7 @@ public class CustomPlot extends Plot implements Cloneable {
 		if (hasFlag(Y_TICKS))
 			x0 += (leftPosition ? 1 : -1) * sc(tickLength - LEGEND_PADDING);
 		if (hasFlag(X_TICKS))
-			y0 += (topPosition ? 1 : -1) * sc(tickLength - LEGEND_PADDING/2);
+			y0 += (topPosition ? 1 : -1) * sc(tickLength - (float)LEGEND_PADDING/2);
 		return new Rectangle(x0, y0, width, height);
 	}
 
@@ -3811,7 +3806,7 @@ public class CustomPlot extends Plot implements Cloneable {
 				if (nPlots > 1) return true;
 			}
 		}
-		return nPlots > 1;
+		return false;
 	}
 
 	public void setPlotMaker(PlotMaker plotMaker) {

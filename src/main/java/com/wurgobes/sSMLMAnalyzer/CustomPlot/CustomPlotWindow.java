@@ -269,11 +269,9 @@ public class CustomPlotWindow extends PlotWindow {
     public void windowActivated(WindowEvent e) {
         super.windowActivated(e);
         if (!wasActivated) {
-            new Thread(new Runnable() {
-                public void run() {
-                    IJ.wait(50);  //sometimes, window layout is done only a few millisec after windowActivated
-                    wasActivated = true;
-                }
+            new Thread(() -> {
+                IJ.wait(50);  //sometimes, window layout is done only a few millisec after windowActivated
+                wasActivated = true;
             }).start();
         }
     }
@@ -364,7 +362,7 @@ public class CustomPlotWindow extends PlotWindow {
     }
 
     MenuItem addPopupItem(PopupMenu popupMenu, String s, boolean isCheckboxItem) {
-        MenuItem mi = null;
+        MenuItem mi;
         if (isCheckboxItem) {
             mi = new CheckboxMenuItem(s);
             ((CheckboxMenuItem)mi).addItemListener(this);
@@ -491,19 +489,18 @@ public class CustomPlotWindow extends PlotWindow {
         if (x < plotCustom.leftMargin || y > plotCustom.topMargin + plotCustom.frameHeight) {
             if (!rangeArrowsVisible && !plotCustom.isFrozen())
                 showRangeArrows();
-            if (activeRangeArrow < 0)       //mouse is not on one of the symbols, ignore (nothing to display)
-            {}
-            else if (activeRangeArrow < 8)  //mouse over an arrow: 0,3,4,7 for increase, 1,2,5,6 for decrease
-                statusText = ((activeRangeArrow+1)&0x02) != 0 ? "Decrease Range" : "Increase Range";
-            else if (activeRangeArrow == 8) //it's the 'R' icon
-                statusText = "Reset Range";
-            else if (activeRangeArrow == 9) //it's the 'F' icon
-                statusText = "Full Range (Fit All)";
-            else if (activeRangeArrow >= 10 &&
-                    activeRangeArrow < 14)  //space between arrow-pairs for single number
-                statusText = "Set limit...";
-            else if (activeRangeArrow >= 14)
-                statusText = "Axis Range & Options...";
+            if (activeRangeArrow >= 0)       //mouse is not on one of the symbols, ignore (nothing to display)
+            {
+                if (activeRangeArrow < 8)  //mouse over an arrow: 0,3,4,7 for increase, 1,2,5,6 for decrease
+                    statusText = ((activeRangeArrow+1)&0x02) != 0 ? "Decrease Range" : "Increase Range";
+                else if (activeRangeArrow == 8) //it's the 'R' icon
+                    statusText = "Reset Range";
+                else if (activeRangeArrow == 9) //it's the 'F' icon
+                    statusText = "Full Range (Fit All)";
+                else if (activeRangeArrow < 14)  //space between arrow-pairs for single number
+                    statusText = "Set limit...";
+                else statusText = "Axis Range & Options...";
+            }
             boolean repaint = false;
             if (activeRangeArrow >= 0 && !rangeArrowRois[activeRangeArrow].contains(x, y)) {
                 rangeArrowRois[activeRangeArrow].setFillColor(
@@ -579,19 +576,19 @@ public class CustomPlotWindow extends PlotWindow {
         int i = 0;
         int height = imp.getHeight();
         int arrowH = plotCustom.topMargin < 14 ? 6 : 8; //height of arrows and distance between them; base is twice that value
-        float[] yP = new float[]{height - arrowH / 2, height - 3 * arrowH / 2, height - 5 * arrowH / 2 - 0.1f};
+        float[] yP = new float[]{height - arrowH / 2f, height - 3 * arrowH / 2f, height - 5 * arrowH / 2f - 0.1f};
 
         for (float x : new float[]{plotCustom.leftMargin, plotCustom.leftMargin + plotCustom.frameWidth}) { //create arrows for x axis
-            float[] x0 = new float[]{x - arrowH / 2, x - 3 * arrowH / 2 - 0.1f, x - arrowH / 2};
+            float[] x0 = new float[]{x - arrowH / 2f, x - 3 * arrowH / 2f - 0.1f, x - arrowH / 2f};
             rangeArrowRois[i++] = new PolygonRoi(x0, yP, 3, Roi.POLYGON);
-            float[] x1 = new float[]{x + arrowH / 2, x + 3 * arrowH / 2 + 0.1f, x + arrowH / 2};
+            float[] x1 = new float[]{x + arrowH / 2f, x + 3 * arrowH / 2f + 0.1f, x + arrowH / 2f};
             rangeArrowRois[i++] = new PolygonRoi(x1, yP, 3, Roi.POLYGON);
         }
-        float[] xP = new float[]{arrowH / 2 - 0.1f, 3 * arrowH / 2, 5 * arrowH / 2 + 0.1f};
+        float[] xP = new float[]{arrowH / 2f - 0.1f, 3 * arrowH / 2f, 5 * arrowH / 2f + 0.1f};
         for (float y : new float[]{plotCustom.topMargin + plotCustom.frameHeight, plotCustom.topMargin}) { //create arrows for y axis
-            float[] y0 = new float[]{y + arrowH / 2, y + 3 * arrowH / 2 + 0.1f, y + arrowH / 2};
+            float[] y0 = new float[]{y + arrowH / 2f, y + 3 * arrowH / 2f + 0.1f, y + arrowH / 2f};
             rangeArrowRois[i++] = new PolygonRoi(xP, y0, 3, Roi.POLYGON);
-            float[] y1 = new float[]{y - arrowH / 2, y - 3 * arrowH / 2 - 0.1f, y - arrowH / 2};
+            float[] y1 = new float[]{y - arrowH / 2f, y - 3 * arrowH / 2f - 0.1f, y - arrowH / 2f};
             rangeArrowRois[i++] = new PolygonRoi(xP, y1, 3, Roi.POLYGON);
         }
         Font theFont = new Font("SansSerif", Font.BOLD, 13);
@@ -680,7 +677,7 @@ public class CustomPlotWindow extends PlotWindow {
     /** creates the data that fills the showList() function values */
     private String getValuesAsString(){
         ResultsTable rt = getResultsTable();
-        StringBuffer sb = new StringBuffer();
+        StringBuilder sb = new StringBuilder();
         for (int i=0; i<rt.size(); i++) {
             sb.append(rt.getRowAsString(i));
             sb.append("\n");
@@ -716,7 +713,7 @@ public class CustomPlotWindow extends PlotWindow {
         float[] xValues = plotCustom.getXValues();
         float[] yValues = plotCustom.getYValues();
         if (xValues == null) return;
-        Clipboard systemClipboard = null;
+        Clipboard systemClipboard;
         try {systemClipboard = getToolkit().getSystemClipboard();}
         catch (Exception e) {systemClipboard = null; }
         if (systemClipboard==null)
@@ -736,8 +733,8 @@ public class CustomPlotWindow extends PlotWindow {
         } else {
             int xdigits = 0;
             if (saveXValues)
-                xdigits = plotCustom.getPrecision(xValues);
-            int ydigits = plotCustom.getPrecision(yValues);
+                xdigits = CustomPlot.getPrecision(xValues);
+            int ydigits = CustomPlot.getPrecision(yValues);
             for (int i=0; i<Math.min(xValues.length, yValues.length); i++) {
                 if (saveXValues)
                     pw.println(IJ.d2s(xValues[i],xdigits)+"\t"+IJ.d2s(yValues[i],ydigits));
@@ -777,8 +774,6 @@ public class CustomPlotWindow extends PlotWindow {
 
     /** Called once when ImageJ quits. */
     public static void savePreferences(Properties prefs) {
-        double min = ProfilePlot.getFixedMin();
-        double max = ProfilePlot.getFixedMax();
         prefs.put(PREFS_WIDTH, Integer.toString(plotWidth));
         prefs.put(PREFS_HEIGHT, Integer.toString(plotHeight));
         prefs.put(PREFS_FONT_SIZE, Integer.toString(defaultFontSize));
@@ -904,7 +899,7 @@ public class CustomPlotWindow extends PlotWindow {
      *  setting the range, etc. */
     public static void freeze() {
         Window win = WindowManager.getActiveWindow();
-        if (win!=null && (win instanceof ij.gui.PlotWindow))
+        if ((win instanceof PlotWindow))
             ((CustomPlotWindow)win).getPlot().setFrozen(true);
     }
 

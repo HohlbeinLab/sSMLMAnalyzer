@@ -417,7 +417,7 @@ public class CustomPlotDialog implements DialogListener {
         }
         if (dialogType >= X_LEFT && dialogType <= Y_TOP) {
             double newLimit = gd.getNextNumber();
-            double[] minMaxCopy = (double[])(plot.getLimits().clone());
+            double[] minMaxCopy = plot.getLimits().clone();
             minMaxCopy[dialogType - X_LEFT] = newLimit;
             plot.setLimitsNoUpdate(minMaxCopy[0], minMaxCopy[1], minMaxCopy[2], minMaxCopy[3]);
         }
@@ -431,11 +431,11 @@ public class CustomPlotDialog implements DialogListener {
                 flags = plot.getFlags() & 0xaaaaaaaa; //keep y flags, i.e., odd bits
             if (dialogType == Y_AXIS)
                 flags = plot.getFlags() & 0x55555555; //keep x flags, i.e., even bits
-            for (int l=0; l<xFlags.length; l++) {
+            for (int xFlag : xFlags) {
                 if (dialogType == AXIS_OPTIONS || dialogType == X_AXIS)
-                    if (gd.getNextBoolean()) flags |= xFlags[l];
+                    if (gd.getNextBoolean()) flags |= xFlag;
                 if (dialogType == AXIS_OPTIONS || dialogType == Y_AXIS)
-                    if (gd.getNextBoolean()) flags |= xFlags[l]<<1; //y flags are shifted up one bit;
+                    if (gd.getNextBoolean()) flags |= xFlag << 1; //y flags are shifted up one bit;
             }
             plot.setFormatFlags(flags);
 
@@ -494,9 +494,9 @@ public class CustomPlotDialog implements DialogListener {
             ImagePlus imp = templatePlot.getImagePlus();
             if (imp != null) templateID = imp.getID();	//remember for next time
             int templateFlags = 0;
-            for (int i=0; i<TEMPLATE_FLAGS.length; i++)
+            for (int templateFlag : TEMPLATE_FLAGS)
                 if (gd.getNextBoolean())
-                    templateFlags |= TEMPLATE_FLAGS[i];
+                    templateFlags |= templateFlag;
             plot.restorePlotProperties();
             plot.restorePlotObjects();
             plot.useTemplate(templatePlot, templateFlags);
@@ -578,10 +578,10 @@ public class CustomPlotDialog implements DialogListener {
             hiResFactor = (float)scale;
         hiResAntiAliased = !gd.getNextBoolean();
         final ImagePlus hiresImp = plot.makeHighResolution(title, hiResFactor, hiResAntiAliased, /*showIt=*/true);
-        /** The following command is needed to have the high-resolution plot as front window. Otherwise, as the
+        /* The following command is needed to have the high-resolution plot as front window. Otherwise, as the
          *	dialog is owned by the original PlotWindow, the WindowManager will see the original plot as active,
          *	but the user interface will show the high-res plot as foreground window */
-        EventQueue.invokeLater(new Runnable() {public void run() {IJ.selectWindow(hiresImp.getID());}});
+        EventQueue.invokeLater(() -> IJ.selectWindow(hiresImp.getID()));
 
         if (Recorder.record) {
             String options = !hiResAntiAliased ? "disable" : "";
