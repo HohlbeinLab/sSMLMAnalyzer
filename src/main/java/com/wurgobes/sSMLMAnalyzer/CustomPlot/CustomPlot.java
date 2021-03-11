@@ -19,6 +19,8 @@ import ij.measure.Measurements;
 import ij.measure.ResultsTable;
 import net.imagej.lut.LUTService;
 
+import static com.wurgobes.sSMLMAnalyzer.Util.getFloatMinMax;
+
 
 /** This class creates an image that line graphs, scatter plots and plots of vector fields
  *	(arrows) can be drawn on and displayed.
@@ -881,6 +883,10 @@ public class CustomPlot extends Plot implements Cloneable {
 		else
 			allPlotObjects.add(new PlotObject(xValues, yValues, zValues, yErrorBars, shape, currentLineWidth, label));
 		objectToReplace = -1;
+
+		float[] minMax = getFloatMinMax(zValues);
+
+		setLUTLegend("Z", 512, minMax[0], minMax[1]);
 		if (plotDrawn) updateImage();
 	}
 

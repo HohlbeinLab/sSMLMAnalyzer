@@ -42,6 +42,7 @@ import java.nio.file.Path;
 import java.util.*;
 
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import static ij.util.ThreadUtil.createThreadArray;
 import static ij.util.ThreadUtil.startAndJoin;
@@ -593,6 +594,14 @@ public class Util {
                 hm.put(j, 1);
         }
         return temp;
+    }
+
+    public static float[] getFloatMinMax(float[] arr){
+        List<Float> list = new ArrayList<>();
+        for(float v : arr){
+            list.add(v);
+        }
+        return getFloatMinMax(list);
     }
 
     public static float[] getFloatMinMax(List<Float> list){
