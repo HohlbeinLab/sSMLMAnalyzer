@@ -60,21 +60,22 @@ import net.imagej.lut.LUTService;
 
 import net.imglib2.type.numeric.IntegerType;
 
+import org.jblas.util.Random;
 import org.scijava.command.Command;
 import org.scijava.log.LogService;
 import org.scijava.plugin.*;
 
 import java.io.*;
 
+import java.lang.reflect.Array;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 
 import fiji.util.gui.GenericDialogPlus;
@@ -1213,7 +1214,84 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
 
                         }
 
+                        boolean specialFlag = false;
 
+                        if(specialFlag) {
+                            float resolutionBinWidth = 250; // 5nm
+
+
+                            FloatMatrix localMedianMatrix = finalPossibilities.getColumns(new int[]{3, 4});
+                            localMedianMatrix.divi(resolutionBinWidth);
+
+                            int[] xValues = localMedianMatrix.getColumn(0).toIntArray();
+                            int[] yValues = localMedianMatrix.getColumn(1).toIntArray();
+                            float[] distanceValues = finalPossibilities.getColumn(12).toArray();
+
+                            IntSummaryStatistics Xstat = Arrays.stream(xValues).summaryStatistics();
+                            IntSummaryStatistics Ystat = Arrays.stream(xValues).summaryStatistics();
+
+                            ArrayList<Point3D> pointList = new ArrayList<>();
+
+                            for (int i = 0; i < localMedianMatrix.rows; i++) {
+                                pointList.add(new Point3D(xValues[i], yValues[i], distanceValues[i]));
+                            }
+
+                            ArrayList<Float> localMedianList = new ArrayList<>();
+                            ArrayList<Double> localAverageList = new ArrayList<>();
+                            ArrayList<Integer> localModeList = new ArrayList<>();
+
+                            for (int x = Xstat.getMin(); x <= Xstat.getMax(); x++) {
+                                final int finalX = x;
+
+                                List<Point3D> sublist = pointList.stream()
+                                        .filter(p -> p.getX() == finalX).collect(Collectors.toList());
+
+                                if(x%100 == 0) System.out.println(x);
+
+                                for (int y = Ystat.getMin(); y <= Ystat.getMax(); y++) {
+
+                                    final int finalY = y;
+
+                                    List<Float> currentMedianList = sublist.stream()
+                                            .filter(p -> p.getY() == finalY).map(Point3D::getZ).collect(Collectors.toList());
+
+
+                                    localModeList.add(mode(currentMedianList));
+                                    double average = getAverage(currentMedianList);
+                                    if(average != 0.0) localAverageList.add(average);
+
+                                    float currentMedian = getMedian(currentMedianList);
+                                    if (currentMedian != Float.MIN_VALUE)
+                                        localMedianList.add(currentMedian);
+
+                                    if(false && currentMedianList.size() > 200 && Random.nextDouble() < 0.1 && getAverage(currentMedianList) > 1800) {
+                                        float[] minMax = getFloatMinMax(currentMedianList);
+                                        createHist(toFloat(currentMedianList.toArray(new Float[0])), getFBins(currentMedianList, 2), 1900,  2100, x + ", " + y, runningFromIDE);
+                                    }
+                                }
+
+                                pointList.removeIf(p -> p.getX() == finalX);
+                            }
+
+
+                            float[] medianMinMax = getFloatMinMax(localMedianList);
+
+
+                            //createHist(toFloat(localMedianList.toArray(new Float[0])), getFBins(localMedianList, 2), 1500,  1800, "medians1", runningFromIDE);
+                            createHist(toFloat(localMedianList.toArray(new Float[0])), getFBins(localMedianList, 2), medianMinMax[0],  medianMinMax[1], "medians2", runningFromIDE);
+
+                            float[] averageMinMax = getDoubleMinMax(localAverageList);
+                            //createHist(toFloat(localAverageList.toArray(new Double[0])), getDBins(localAverageList, 2), 1500,  1800, "mean1", runningFromIDE);
+                            createHist(toFloat(localAverageList.toArray(new Double[0])), getDBins(localAverageList, 2), averageMinMax[0],  averageMinMax[1], "mean2", runningFromIDE);
+
+                            double[] modes = toDouble(localModeList);
+                            //int[] ranges = new int[]{1500, 1800};
+                            int[] ranges = new int[]{(int) averageMinMax[0], (int) averageMinMax[1]};
+                            createHist(toFloat(modes), (int) ((ranges[1]-ranges[0])/2.5), ranges[0], ranges[1], "modes1", runningFromIDE);
+                            //ranges = new int[]{1900, 2100};
+                            //createHist(toFloat(modes), (int) ((ranges[1]-ranges[0])/2.5), ranges[0], ranges[1], "modes2", runningFromIDE);
+
+                        }
 
                         if (saveSCV) {
                             // Remove unneeded Z column before saving
@@ -1370,8 +1448,9 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
         // private final float[] distRange = {1940, 2600}; //1800 3000 (1940, 2240)
 
         //debug_arg_string = "csv_in=F:\\ThesisData\\output\\combined_drift.csv csv_out=C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\testing visualisation=true";
-        // debug_arg_string = "csv_in=F:\\ThesisData\\output\\niels.csv csv_out=C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\testing order_number=2 visualisation=true";
-        debug_arg_string = "csv_in=F:\\ThesisData\\output\\output3_drift_noZ.csv csv_out=C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\testing angle_start=-0.11 angle_end=0.09 distance_start=1332 distance_end=2244 check_distance_delta=true distance_delta=50 visualisation=true";
+        //debug_arg_string = "csv_in=F:\\ThesisData\\output\\niels.csv csv_out=C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\testing order_number=2 visualisation=true";
+        //debug_arg_string = "csv_in=F:\\ThesisData\\output\\niels.csv visualisation=true angle_start=-0.09 angle_end=0.10 distance_start=2878 distance_end=4386";
+        debug_arg_string = "csv_in=F:\\ThesisData\\output\\output3_drift.csv csv_out=C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\testing angle_start=-0.11 angle_end=0.09 distance_start=1332 distance_end=2244 check_distance_delta=true distance_delta=50 visualisation=true";
 
         //debug_arg_string = "";
         net.imagej.ImageJ ij = new ImageJ();
@@ -1379,4 +1458,18 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
 
         ij.command().run(sSMLMA.class, true);
     }
+}
+
+class Point3D {
+    float x, y, z;
+
+    Point3D(float x, float y, float z){
+        this.x = x;
+        this.y = y;
+        this.z = z;
+    }
+
+    public float getX() { return x;}
+    public float getY() { return y;}
+    public float getZ() { return z;}
 }

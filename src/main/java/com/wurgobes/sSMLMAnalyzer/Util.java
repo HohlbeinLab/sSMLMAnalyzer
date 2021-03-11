@@ -23,6 +23,7 @@ SOFTWARE.
 
 import ij.IJ;
 import ij.ImagePlus;
+import ij.gui.HistogramWindow;
 import ij.gui.Plot;
 import ij.process.FloatProcessor;
 
@@ -38,11 +39,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.*;
 
-import java.util.Collections;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static ij.util.ThreadUtil.createThreadArray;
@@ -120,6 +118,30 @@ public class Util {
         return result;
     }
 
+    public static float[] toFloat(double[] v){
+        float[] result = new float[v.length];
+        for(int i = 0; i < v.length; i++)
+            result[i] = (float) v[i];
+
+        return result;
+    }
+
+    public static float[] toFloat(Double[] v){
+        float[] result = new float[v.length];
+        for(int i = 0; i < v.length; i++)
+            result[i] = v[i] == null ? 0f : v[i].floatValue();
+
+        return result;
+    }
+
+    public static float[] toFloat(Float[] v){
+        float[] result = new float[v.length];
+        for(int i = 0; i < v.length; i++)
+            result[i] =  v[i] == null ? 0f : v[i];
+
+        return result;
+    }
+
     public static FloatMatrix extend(final FloatMatrix A, int rows, int columns){
         // extends a FloatMatrix with 0's to the size provided
         if(A.rows == rows && A.columns == columns) return A;
@@ -147,6 +169,16 @@ public class Util {
     public static int getBins(FloatMatrix A, float width){
         // Returns the amount of bins required to get the width desired
         return (int) ((A.max()-A.min())/width);
+    }
+
+    public static int getFBins(List<Float> list, float width){
+        float[] result = getFloatMinMax(list);
+        return (int)((result[1] - result[0])/width);
+    }
+
+    public static int getDBins(List<Double> list, float width){
+        float[] result = getDoubleMinMax(list);
+        return (int)((result[1] - result[0])/width);
     }
 
     public static String getOrdinal(int i) {
@@ -468,7 +500,17 @@ public class Util {
 
         double buffer = 0.2;
 
-        return new boolean[][] {{(std.evaluate(toDouble(bins)) / A.rows) > 0.05, minIdx < bins.size()*buffer || minIdx > bins.size()*(1-buffer), maxIdx > (bins.size() * 0.4) || maxIdx < (bins.size() * 0.6)}, {Math.abs(upperbins - lowerbins) > Math.max(upperbins, lowerbins) * 0.2, lowerbins > upperbins}};
+        return new boolean[][] {
+                {
+                    (std.evaluate(toDouble(bins)) / A.rows) > 0.05,
+                    minIdx < bins.size()*buffer || minIdx > bins.size()*(1-buffer),
+                    maxIdx > (bins.size() * 0.4) || maxIdx < (bins.size() * 0.6)
+                },
+                {
+                    Math.abs(upperbins - lowerbins) > Math.max(upperbins, lowerbins) * 0.2,
+                    lowerbins > upperbins
+                }
+        };
     }
 
     public static void saveThunderSTORM(Path CSV_FILE_NAME, final FloatMatrix data){
@@ -509,5 +551,78 @@ public class Util {
         Arrays.fill(tempArr, value);
 
         A.putColumn(c, new FloatMatrix(tempArr));
+    }
+
+    public static float getMedian(List<Float> list){
+        Collections.sort(list);
+        int middle = list.size() / 2;
+        middle = middle > 0 && middle % 2 == 0 ? middle - 1 : middle;
+        if(list.size() > 0)
+            return list.get(middle);
+        else
+            return Float.MIN_VALUE;
+    }
+
+    public static int mode(List<Float> list){
+        int[] temp_arr = new int[list.size()];
+        for(int i = 0; i < list.size(); i++){
+            temp_arr[i] = list.get(i).intValue();
+        }
+        return mode(temp_arr);
+    }
+    public static int mode(int[] array) {
+        //https://stackoverflow.com/questions/15725370/write-a-mode-method-in-java-to-find-the-most-frequently-occurring-element-in-an
+
+        HashMap<Integer,Integer> hm = new HashMap<>();
+        int max  = 1;
+        int temp = 0;
+
+        for (int j : array) {
+
+            if (hm.get(j) != null) {
+
+                int count = hm.get(j);
+                count++;
+                hm.put(j, count);
+
+                if (count > max) {
+                    max = count;
+                    temp = j;
+                }
+            } else
+                hm.put(j, 1);
+        }
+        return temp;
+    }
+
+    public static float[] getFloatMinMax(List<Float> list){
+        if(list.size() == 0){
+            return new float[]{0, 0};
+        }
+        List<Float> sortedlist = new ArrayList<>(list);
+        Collections.sort(sortedlist);
+        return new float[]{sortedlist.get(0), sortedlist.get(sortedlist.size() - 1)};
+    }
+
+    public static float[] getDoubleMinMax(List<Double> list){
+        if(list.size() == 0){
+            return new float[]{0, 0};
+        }
+        List<Double> sortedlist = new ArrayList<>(list);
+        Collections.sort(sortedlist);
+        return new float[]{sortedlist.get(0).floatValue(), sortedlist.get(sortedlist.size() - 1).floatValue()};
+    }
+
+    public static void createHist(float[] data, int bins, float min, float max, String title, boolean runningFromIDE){
+        ImagePlus imp = new ImagePlus("", new FloatProcessor(new float[][]{data}));
+        HistogramWindow histogramWindow = new HistogramWindow(title, imp, bins, min, max);
+        if (runningFromIDE) histogramWindow.getImagePlus().show();
+    }
+
+    public static double getAverage(List<Float> list){
+        return list
+                .stream()
+                .mapToDouble(a -> a)
+                .average().orElse(0.0);
     }
 }

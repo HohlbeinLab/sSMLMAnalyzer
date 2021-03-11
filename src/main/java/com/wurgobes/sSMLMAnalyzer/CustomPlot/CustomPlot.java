@@ -3867,17 +3867,21 @@ public class CustomPlot extends Plot implements Cloneable {
 		ResultsTable rt = new ResultsTable();
 		// find the longest x-value data set and count the data sets
 		int nDataSets =	 0;
+		int nXYZDataSets = 0;
 		int tableLength = 0;
-		for (PlotObject plotObject : allPlotObjects)
+
+		for (PlotObject plotObject : allPlotObjects) {
 			if (plotObject.xValues != null) {
 				nDataSets++;
 				tableLength = Math.max(tableLength, plotObject.xValues.length);
 			}
+			if (plotObject.type == PlotObject.XYZ_DATA) nXYZDataSets++;
+		}
 		if (nDataSets == 0)
 			return null;
 		// enter columns one by one to lists of data and headings
-		ArrayList<String> headings = new ArrayList<>(2*nDataSets);
-		ArrayList<float[]> data = new ArrayList<>(2*nDataSets);
+		ArrayList<String> headings = new ArrayList<>(2*nDataSets + nXYZDataSets);
+		ArrayList<float[]> data = new ArrayList<>(2*nDataSets + nXYZDataSets);
 		int dataSetNumber = 0;
 		int arrowsNumber = 0;
 		PlotObject firstXYobject = null;
@@ -3894,16 +3898,25 @@ public class CustomPlot extends Plot implements Cloneable {
 		}
 		firstXYobject = null;
 		for (PlotObject plotObject : allPlotObjects) {
-			if (plotObject.type==PlotObject.XY_DATA || plotObject.type==PlotObject.XYZ_DATA) {
+			if(plotObject.type == PlotObject.XYZ_DATA){
 				boolean sameX = firstXYobject!=null && Arrays.equals(firstXYobject.xValues, plotObject.xValues) && allSameLength;
 				boolean sameXY = sameX && Arrays.equals(firstXYobject.yValues, plotObject.yValues); //ignore duplicates (e.g. Markers plus Curve)
 				boolean writeX = firstXYobject==null ? writeFirstXColumn : !sameX;
-				addToLists(headings, data, plotObject, dataSetNumber, writeX, /*writeY=*/!sameXY, /*multipleSets=*/nDataSets>1, useLabels);
+				addToLists(headings, data, plotObject, dataSetNumber, writeX, /*writeY=*/!sameXY, /*multipleSets=*/nDataSets>1, useLabels, true);
+				if (firstXYobject == null)
+					firstXYobject = plotObject;
+				dataSetNumber++;
+			}
+			else if (plotObject.type==PlotObject.XY_DATA) {
+				boolean sameX = firstXYobject!=null && Arrays.equals(firstXYobject.xValues, plotObject.xValues) && allSameLength;
+				boolean sameXY = sameX && Arrays.equals(firstXYobject.yValues, plotObject.yValues); //ignore duplicates (e.g. Markers plus Curve)
+				boolean writeX = firstXYobject==null ? writeFirstXColumn : !sameX;
+				addToLists(headings, data, plotObject, dataSetNumber, writeX, /*writeY=*/!sameXY, /*multipleSets=*/nDataSets>1, useLabels, false);
 				if (firstXYobject == null)
 					firstXYobject = plotObject;
 				dataSetNumber++;
 			} else if (plotObject.type==PlotObject.ARROWS) {
-				addToLists(headings, data, plotObject, arrowsNumber, /*writeX=*/true, /*writeY=*/true, /*multipleSets=*/nDataSets>1, /*useLabels=*/false);
+				addToLists(headings, data, plotObject, arrowsNumber, /*writeX=*/true, /*writeY=*/true, /*multipleSets=*/nDataSets>1, /*useLabels=*/false, false);
 				arrowsNumber++;
 			}
 		}
@@ -3932,7 +3945,7 @@ public class CustomPlot extends Plot implements Cloneable {
 	static final double MIN_FLOAT_PRECISION = 1e-5;
 
 	void addToLists(ArrayList<String> headings, ArrayList<float[]>data, PlotObject plotObject,
-			int dataSetNumber, boolean writeX, boolean writeY, boolean multipleSets, boolean useLabels) {
+			int dataSetNumber, boolean writeX, boolean writeY, boolean multipleSets, boolean useLabels, boolean zData) {
 		String plotObjectLabel = useLabels ? replaceSpacesEtc(plotObject.label) : null;
 		if (writeX) {
 			String label = null;                                                     // column header for x column
@@ -3976,6 +3989,13 @@ public class CustomPlot extends Plot implements Cloneable {
 			}
 			headings.add(label);
 			data.add(plotObject.yValues);
+		}
+		if(zData){
+			String label = getLabel('u');
+
+			if(label == null) label = "Z";
+			headings.add(label);
+			data.add(plotObject.zValues);
 		}
 		if (plotObject.xEValues != null) {
 			String label = plotObject.type == PlotObject.ARROWS ? "XEnd" : "XERR";
