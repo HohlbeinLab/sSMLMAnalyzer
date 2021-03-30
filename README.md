@@ -10,7 +10,7 @@ This Plugin features a module that tries to determine the angle of the grating, 
 One can get the Plugin by using the download link below, or by subscribing to the Hohlbein lab update site. You can subscribe by going to Help > Update... > Manage Update Sites and checking the Hohlbein lab site. It will automatically be downloaded and updated.
 
 This plugin requires two files: sSMLMA.jar and jblas.jar:  
-The latest version of sSMLA.jar (latest = 0.10.4) can be found [Here](https://github.com/HohlbeinLab/sSMLMAnalyzer)  
+The latest version of sSMLA.jar (latest = 0.10.5) can be found [Here](https://github.com/HohlbeinLab/sSMLMAnalyzer)  
 The latest version of jblas.jar can be found [Here](https://repo1.maven.org/maven2/org/jblas/jblas/1.2.5/jblas-1.2.5.jar)
 
 

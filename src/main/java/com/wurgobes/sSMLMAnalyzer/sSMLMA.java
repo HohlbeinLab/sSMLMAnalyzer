@@ -182,6 +182,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
     private boolean processing = true;
     private static boolean debug = false;
     private static String debug_arg_string = "";
+    private static boolean runningFromMacro = false;
     private static boolean runningFromIDE = false;
 
     private static String GetInputStream(InputStream is) {
@@ -224,7 +225,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
             saveSCV = false;
             visualisation = false;
             searchAngle = false;
-
+            runningFromMacro = true;
 
             String[] arguments = arg.split(" ");
 
@@ -236,111 +237,176 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                     "angle_flip", "angle_mirror", "angle_search", "angle_deep_search",
                     "lone_pair_remove", "lone_pair_neighbours", "lone_pair_distance",
                     "visualisation", "visualisationZOLA", "hist_binwidth", "LUT", "LUT_start", "LUT_end",
-                    "check_z", "check_z_margin", "check_distance_delta", "distance_delta"
+                    "check_z", "check_z_margin", "check_distance_delta", "distance_delta",
+                    //These are for macro recording mode.. dont think about it
+                    "browse", "csv", "save", "csv_0", "start", "end", "start_0", "end_0",
+                    "number", "restrict", "max", "intensity", "ratio", "flip", "mirror",
+                    "search", "search_0", "remove", "required_0", "remove_0", "maximum", "visualise",
+                    "visualise_0", "histogram", "start_1", "end_1", "file_path"
+            };
+            String[] macroRecordingKeywords = {
+                    "browse", "csv", "save", "csv_0", "start", "end", "start_0", "end_0",
+                    "number", "restrict", "max", "intensity", "ratio", "flip", "mirror",
+                    "search", "search_0", "remove", "required_0", "remove_0", "maximum", "visualise",
+                    "visualise_0", "histogram", "start_1", "end_1", "file_path"
             };
             // For each keyword find the right variable and set it
             // if not found, or the value is malformed, throw an error
             for(String a : arguments) {
-                if (a.contains("=")) {
-                    if (a.contains("=")) {
-                        String[] keyword_val = a.split("=");
-                        try {
-                            switch (keyword_val[0]) {
-                                case "csv_in":
-                                    filePath = keyword_val[1];
-                                    break;
-                                case "csv_out":
+                if (a.contains("=") || Arrays.asList(macroRecordingKeywords).contains(a)) {
+                    String[] keyword_val = a.split("=");
+                    try {
+                        switch (keyword_val[0]) {
+                            case "csv_in":
+                            case "browse":
+                            case "csv":
+                                filePath = keyword_val[1];
+                                break;
+                            case "csv_0":
+                            case "csv_out":
+                                if(!keyword_val[1].equals("[]")){
                                     saveSCV = true;
                                     csv_target_dir = keyword_val[1];
-                                    break;
-                                case "angle_start":
-                                    angInput[0] = Float.parseFloat(keyword_val[1]);
-                                    break;
-                                case "angle_end":
-                                    angInput[1] = Float.parseFloat(keyword_val[1]);
-                                    break;
-                                case "distance_start":
-                                    distInput[0] = Float.parseFloat(keyword_val[1]);
-                                    break;
-                                case "distance_end":
-                                    distInput[1] = Float.parseFloat(keyword_val[1]);
-                                    break;
-                                case "order_number":
-                                    orders = Integer.parseInt(keyword_val[1]);
-                                    break;
-                                case "check_order_intensity":
-                                    checkForIntensity = Boolean.parseBoolean(keyword_val[1]);
-                                    break;
-                                case "check_order_ratio":
-                                    ratioIntensity = Float.parseFloat(keyword_val[1]);
-                                    break;
-                                case "angle_flip":
-                                    flipAngles = Boolean.parseBoolean(keyword_val[1]);
-                                    break;
-                                case "angle_mirror":
-                                    mirrorAngles = Boolean.parseBoolean(keyword_val[1]);
-                                    break;
-                                case "angle_search":
-                                    searchAngle = Boolean.parseBoolean(keyword_val[1]);
-                                    break;
-                                case "angle_deep_search":
-                                    deepSearchAngle = Boolean.parseBoolean(keyword_val[1]);
-                                    if(deepSearchAngle) searchAngle = true;
-                                    break;
-                                case "lone_pair_remove":
-                                    toCleanup = Boolean.parseBoolean(keyword_val[1]);
-                                    break;
-                                case "lone_pair_neighbours":
-                                    neighbours = Integer.parseInt(keyword_val[1]);
-                                    break;
-                                case "lone_pair_distance":
-                                    cleanDistance = Float.parseFloat(keyword_val[1]);
-                                    break;
-                                case "visualisation":
-                                    visualisation = Boolean.parseBoolean(keyword_val[1]);
-                                    break;
-                                case "visualisationZOLA":
-                                    visualiseZOLA = Boolean.parseBoolean(keyword_val[1]);
-                                    break;
-                                case "hist_binwidth":
-                                    binwidth = Float.parseFloat(keyword_val[1]);
-                                    break;
-                                case "LUT":
-                                    defaultLUT = keyword_val[1];
-                                    break;
-                                case "LUT_start":
-                                    lutRange[0] = Float.parseFloat(keyword_val[1]);
-                                    break;
-                                case "LUT_end":
-                                    lutRange[1] = Float.parseFloat(keyword_val[1]);
-                                    break;
-                                case "check_z":
-                                    checkforZ = Boolean.parseBoolean(keyword_val[1]);
-                                    break;
-                                case "check_z_margin":
-                                    zMargin = Float.parseFloat(keyword_val[1]);
-                                case "check_distance_delta":
-                                    checkDistanceOrderDelta = Boolean.parseBoolean(keyword_val[1]);
-                                    break;
-                                case "distance_delta":
-                                    distanceDelta = Float.parseFloat(keyword_val[1]);
-                                    break;
-                                default:
-                                    logService.error("Keyword " + keyword_val[0] + " not found\nDid you mean: " + getTheClosestMatch(keywords, keyword_val[0]) + "?");
-                                    return false;
-                            }
-                        } catch (ArrayIndexOutOfBoundsException e) {
-                            logService.error("Malformed token: " + a + ".\nDid you remember to format it as keyword=value?");
-                            return false;
-                        } catch (Exception e){
-                            logService.error("Failed to parse argument:" + a);
-                            return false;
+                                }
+                                break;
+                            case "start":
+                            case "angle_start":
+                                angInput[0] = (float) (Float.parseFloat(keyword_val[1]) * (Math.PI / 180f));
+                                break;
+                            case "end":
+                            case "angle_end":
+                                angInput[1] = (float) (Float.parseFloat(keyword_val[1]) * (Math.PI / 180f));
+                                break;
+                            case "start_0":
+                            case "distance_start":
+                                distInput[0] = Float.parseFloat(keyword_val[1]);
+                                break;
+                            case "end_0":
+                            case "distance_end":
+                                distInput[1] = Float.parseFloat(keyword_val[1]);
+                                break;
+                            case "number":
+                            case "order_number":
+                                orders = Integer.parseInt(keyword_val[1]);
+                                break;
+                            case "intensity":
+                                checkForIntensity = true;
+                                break;
+                            case "check_order_intensity":
+                                checkForIntensity = Boolean.parseBoolean(keyword_val[1]);
+                                break;
+                            case "ratio":
+                            case "check_order_ratio":
+                                ratioIntensity = Float.parseFloat(keyword_val[1]);
+                                break;
+                            case "flip":
+                                flipAngles = true;
+                                break;
+                            case "angle_flip":
+                                flipAngles = Boolean.parseBoolean(keyword_val[1]);
+                                break;
+                            case "mirror":
+                                mirrorAngles = true;
+                                break;
+                            case "angle_mirror":
+                                mirrorAngles = Boolean.parseBoolean(keyword_val[1]);
+                                break;
+                            case "search":
+                                searchAngle = true;
+                                break;
+                            case "angle_search":
+                                searchAngle = Boolean.parseBoolean(keyword_val[1]);
+                                break;
+                            case "search_0":
+                                deepSearchAngle = true;
+                                searchAngle = true;
+                                break;
+                            case "angle_deep_search":
+                                deepSearchAngle = Boolean.parseBoolean(keyword_val[1]);
+                                if(deepSearchAngle) searchAngle = true;
+                                break;
+                            case "remove":
+                                toCleanup = true;
+                                break;
+                            case "lone_pair_remove":
+                                toCleanup = Boolean.parseBoolean(keyword_val[1]);
+                                break;
+                            case "required":
+                            case "lone_pair_neighbours":
+                                neighbours = Integer.parseInt(keyword_val[1]);
+                                break;
+                            case "required_0":
+                            case "lone_pair_distance":
+                                cleanDistance = Float.parseFloat(keyword_val[1]);
+                                break;
+                            case "visualise":
+                                visualisation = true;
+                                break;
+                            case "visualisation":
+                                visualisation = Boolean.parseBoolean(keyword_val[1]);
+                                break;
+                            case "visualise_0":
+                                visualiseZOLA = true;
+                                break;
+                            case "visualisationZOLA":
+                                visualiseZOLA = Boolean.parseBoolean(keyword_val[1]);
+                                break;
+                            case "histogram":
+                            case "hist_binwidth":
+                                binwidth = Float.parseFloat(keyword_val[1]);
+                                break;
+                            case "LUT":
+                                defaultLUT = keyword_val[1];
+                                break;
+                            case "start_1":
+                            case "LUT_start":
+                                lutRange[0] = Float.parseFloat(keyword_val[1]);
+                                break;
+                            case "end_1":
+                            case "LUT_end":
+                                lutRange[1] = Float.parseFloat(keyword_val[1]);
+                                break;
+                            case "restrict":
+                                checkforZ = true;
+                                break;
+                            case "check_z":
+                                checkforZ = Boolean.parseBoolean(keyword_val[1]);
+                                break;
+                            case "max":
+                            case "check_z_margin":
+                                zMargin = Float.parseFloat(keyword_val[1]);
+                                break;
+                            case "remove_0":
+                                checkDistanceOrderDelta = true;
+                                break;
+                            case "check_distance_delta":
+                                checkDistanceOrderDelta = Boolean.parseBoolean(keyword_val[1]);
+                                break;
+                            case "maximum":
+                            case "distance_delta":
+                                distanceDelta = Float.parseFloat(keyword_val[1]);
+                                break;
+                            case "file_path":
+                                break;
+                            case "save":
+                                saveSCV = true;
+                                break;
+                            default:
+                                logService.error("Keyword " + keyword_val[0] + " not found\nDid you mean: " + getTheClosestMatch(keywords, keyword_val[0]) + "?");
+                                return false;
                         }
-                    } else {
+                    } catch (ArrayIndexOutOfBoundsException e) {
                         logService.error("Malformed token: " + a + ".\nDid you remember to format it as keyword=value?");
                         return false;
+                    } catch (Exception e){
+                        logService.error("Failed to parse argument:" + a);
+                        return false;
                     }
+                } else {
+                    logService.error("Malformed token: " + a + ".\nDid you remember to format it as keyword=value?");
+                    return false;
                 }
+
             }
 
         } else {
@@ -362,9 +428,9 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                 gd.addMessage("If you want to override the calculated values change the values below.\nWill only overwrite values if they are NOT 0.");
 
 
-                gd.addNumericField("Start Angle", angRange[0]);
+                gd.addNumericField("Start Angle (deg)", angRange[0]);
                 gd.addToSameRow();
-                gd.addNumericField("End Angle", angRange[1]);
+                gd.addNumericField("End Angle (deg)", angRange[1]);
 
                 gd.addNumericField("Start Distance", distRange[0]);
                 gd.addToSameRow();
@@ -451,8 +517,10 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                 saveSCV = gd.getNextBoolean();
                 csv_target_dir = gd.getNextString();
 
-                angInput[0] = (float) gd.getNextNumber();
-                angInput[1] = (float) gd.getNextNumber();
+                angInput[0] = (float) (gd.getNextNumber() * (Math.PI / 180f));
+                angInput[1] = (float) (gd.getNextNumber() * (Math.PI / 180f));
+
+                System.out.print(Arrays.toString(angInput));
 
                 distInput[0] = (float) gd.getNextNumber();
                 distInput[1] = (float) gd.getNextNumber();
@@ -608,6 +676,12 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
             // This boolean indicates if the angle finding succeeded or failed, along side some other checks
             boolean succes = false;
 
+            if (angInput[0] * angInput[1] * distInput[0] * distInput[1] != 0) {
+                searchAngle = false;
+                deepSearchAngle = false;
+                flipAngles = false;
+                mirrorAngles = false;
+            }
 
             if (processing && floatMatrix != null) {
                 // Echo back settings used when searching for the best angle
@@ -996,7 +1070,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                             if (saveSCV) message += ("CSV files were saved to the folder: " + csv_target_dir + "\n");
 
                             if (runningFromIDE) logService.info(message);
-                            IJ.showMessage(message);
+                            if (!runningFromMacro)IJ.showMessage(message);
                         }
 
                     }
@@ -1013,7 +1087,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
 
                     // Anything after this point is skipped if we are not in the final run
                     // So this point is only reached with the best (hopefully) results
-                    if ((!(retry && searchAngle) | (foundBestResult && deepSearchAngle)) && displayInfo) {
+                    if ((!(retry && searchAngle) | (foundBestResult && deepSearchAngle)) && displayInfo && finalPossibilities.rows > 0) {
                         displayInfo = false; // ensures this path is only ran once
 
                         // We remove any points with too few neighbours here, if enabled
@@ -1156,8 +1230,10 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
 
                             // Take all the angles for the first pair, create an image and display it
                             // width of bins is hardcoded to 0.005 rad
-                            ImagePlus Angles = new ImagePlus("", new FloatProcessor(finalPossibilities.getColumn(13).toArray2()));
-                            HistogramWindow angleHist = new HistogramWindow("Angles", Angles, getBins(finalPossibilities.getColumn(13), 0.005f), angRange[0], angRange[1]);
+                            FloatMatrix AnglesRad = finalPossibilities.getColumn(13);
+                            AnglesRad.muli((float) (180/Math.PI));
+                            ImagePlus Angles = new ImagePlus("", new FloatProcessor(AnglesRad.toArray2()));
+                            HistogramWindow angleHist = new HistogramWindow("Angles (degrees)", Angles, getBins(AnglesRad, (float) (0.005f * (180/Math.PI))), angRange[0] * (180/Math.PI), angRange[1]* (180/Math.PI));
                             if (runningFromIDE) angleHist.getImagePlus().show();
 
                             ///////////////////////////////////////////////////////////// PLOTS
@@ -1450,9 +1526,9 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
         //debug_arg_string = "csv_in=F:\\ThesisData\\output\\combined_drift.csv csv_out=C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\testing visualisation=true";
         //debug_arg_string = "csv_in=F:\\ThesisData\\output\\niels.csv csv_out=C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\testing order_number=2 visualisation=true";
         //debug_arg_string = "csv_in=F:\\ThesisData\\output\\niels.csv visualisation=true angle_start=-0.09 angle_end=0.10 distance_start=2878 distance_end=4386";
-        debug_arg_string = "csv_in=F:\\ThesisData\\output\\output3_drift.csv csv_out=C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\testing angle_start=-0.11 angle_end=0.09 distance_start=1332 distance_end=2244 check_distance_delta=true distance_delta=50 visualisation=true";
+        //debug_arg_string = "csv_in=F:\\ThesisData\\output\\output3_drift.csv csv_out=C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\testing angle_start=-2 angle_end=4 distance_start=1332 distance_end=2244 check_distance_delta=true distance_delta=50 visualisation=true";
 
-        //debug_arg_string = "";
+        debug_arg_string = "";
         net.imagej.ImageJ ij = new ImageJ();
         ij.ui().showUI();
 

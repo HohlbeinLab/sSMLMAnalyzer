@@ -55,6 +55,7 @@ import org.jblas.FloatMatrix;
 import org.scijava.command.Command;
 import org.scijava.log.LogService;
 
+import java.awt.*;
 import java.util.ArrayList;
 
 import static com.wurgobes.sSMLMAnalyzer.Util.*;
@@ -244,7 +245,13 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
         particleAnalyzer.analyze(masked);
 
         if(!debug) {
-            WindowManager.closeAllWindows();
+            //WindowManager.closeAllWindows();
+            masked.close();
+            distance.close();
+            FFTImage.close();
+            WindowManager.getImage("Mask of masked").close();
+            WindowManager.getImage("Image 0").close();
+
         } else {
             resultsTable.show("Features");
         }
