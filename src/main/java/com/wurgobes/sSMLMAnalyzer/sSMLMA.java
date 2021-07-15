@@ -227,7 +227,8 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
             searchAngle = false;
             runningFromMacro = true;
 
-            String[] arguments = arg.split(" ");
+            final Pattern pattern = Pattern.compile("(\\w+)(=(\"[^\"]+\"|\\S+))?");
+            Matcher m = pattern.matcher(arg);
 
             // All accepted keywords
             String[] keywords = {
@@ -238,7 +239,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                     "lone_pair_remove", "lone_pair_neighbours", "lone_pair_distance",
                     "visualisation", "visualisationZOLA", "hist_binwidth", "LUT", "LUT_start", "LUT_end",
                     "check_z", "check_z_margin", "check_distance_delta", "distance_delta",
-                    //These are for macro recording mode.. dont think about it
+                    //These are for macro recording mode.. don't think about it
                     "browse", "csv", "save", "csv_0", "start", "end", "start_0", "end_0",
                     "number", "restrict", "max", "intensity", "ratio", "flip", "mirror",
                     "search", "search_0", "remove", "required_0", "remove_0", "maximum", "visualise",
@@ -252,9 +253,9 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
             };
             // For each keyword find the right variable and set it
             // if not found, or the value is malformed, throw an error
-            for(String a : arguments) {
-                if (a.contains("=") || Arrays.asList(macroRecordingKeywords).contains(a)) {
-                    String[] keyword_val = a.split("=");
+            while (m.find()) {
+                if (m.groupCount() == 3 || Arrays.asList(macroRecordingKeywords).contains(m.group(1))) {
+                    String[] keyword_val = {m.group(1), m.group(3) != null ? m.group(3).replace("\"", "") : String.valueOf(false)};
                     try {
                         switch (keyword_val[0]) {
                             case "csv_in":
@@ -264,7 +265,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                                 break;
                             case "csv_0":
                             case "csv_out":
-                                if(!keyword_val[1].equals("[]")){
+                                if (!keyword_val[1].equals("[]")) {
                                     saveSCV = true;
                                     csv_target_dir = keyword_val[1];
                                 }
@@ -323,7 +324,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                                 break;
                             case "angle_deep_search":
                                 deepSearchAngle = Boolean.parseBoolean(keyword_val[1]);
-                                if(deepSearchAngle) searchAngle = true;
+                                if (deepSearchAngle) searchAngle = true;
                                 break;
                             case "remove":
                                 toCleanup = true;
@@ -395,15 +396,12 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                                 logService.error("Keyword " + keyword_val[0] + " not found\nDid you mean: " + getTheClosestMatch(keywords, keyword_val[0]) + "?");
                                 return false;
                         }
-                    } catch (ArrayIndexOutOfBoundsException e) {
-                        logService.error("Malformed token: " + a + ".\nDid you remember to format it as keyword=value?");
-                        return false;
-                    } catch (Exception e){
-                        logService.error("Failed to parse argument:" + a);
+                    } catch (Exception e) {
+                        logService.error("Failed to parse argument:" + keyword_val[0]);
                         return false;
                     }
                 } else {
-                    logService.error("Malformed token: " + a + ".\nDid you remember to format it as keyword=value?");
+                    logService.error("Malformed argument String. Did you remember to format it as keyword=value and wrap filepaths with quotes? Entire argument string was: " + arg);
                     return false;
                 }
 
@@ -1523,12 +1521,12 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
         // private final float[] angRange = {(float) (-1 * Math.PI), (float) (-0.95 * Math.PI) }; //more than and less than
         // private final float[] distRange = {1940, 2600}; //1800 3000 (1940, 2240)
 
-        //debug_arg_string = "csv_in=F:\\ThesisData\\output\\combined_drift.csv csv_out=C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\testing visualisation=true";
+        debug_arg_string = "csv_in=\"H:\\ThesisData\\output with a space\\combined_drift.csv\" csv_out=\"C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\testing with a space\" visualisation=true";
         //debug_arg_string = "csv_in=F:\\ThesisData\\output\\niels.csv csv_out=C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\testing order_number=2 visualisation=true";
         //debug_arg_string = "csv_in=F:\\ThesisData\\output\\niels.csv visualisation=true angle_start=-0.09 angle_end=0.10 distance_start=2878 distance_end=4386";
         //debug_arg_string = "csv_in=F:\\ThesisData\\output\\output3_drift.csv csv_out=C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\testing angle_start=-2 angle_end=4 distance_start=1332 distance_end=2244 check_distance_delta=true distance_delta=50 visualisation=true";
 
-        debug_arg_string = "";
+        //debug_arg_string = "";
         net.imagej.ImageJ ij = new ImageJ();
         ij.ui().showUI();
 

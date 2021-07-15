@@ -250,7 +250,9 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
             distance.close();
             FFTImage.close();
             WindowManager.getImage("Mask of masked").close();
-            WindowManager.getImage("Image 0").close();
+            try{WindowManager.getImage("Image 1").close();} catch (Exception ignored){}
+            try{WindowManager.getImage("Image 0").close();} catch (Exception ignored){}
+
 
         } else {
             resultsTable.show("Features");
