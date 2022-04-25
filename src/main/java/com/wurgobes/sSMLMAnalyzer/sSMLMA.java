@@ -72,6 +72,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -227,7 +228,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
             searchAngle = false;
             runningFromMacro = true;
 
-            final Pattern pattern = Pattern.compile("(\\w+)(=(\"[^\"]+\"|\\S+))?");
+            final Pattern pattern = Pattern.compile("(\\w+)(=('[^']+'|\\S+))?");
             Matcher m = pattern.matcher(arg);
 
             // All accepted keywords
@@ -253,21 +254,22 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
             };
             // For each keyword find the right variable and set it
             // if not found, or the value is malformed, throw an error
+            logService.info(arg);
             while (m.find()) {
                 if (m.groupCount() == 3 || Arrays.asList(macroRecordingKeywords).contains(m.group(1))) {
-                    String[] keyword_val = {m.group(1), m.group(3) != null ? m.group(3).replace("\"", "") : String.valueOf(false)};
+                    String[] keyword_val = {m.group(1), m.group(3) != null ? m.group(3).replace("'", "") : String.valueOf(false)};
                     try {
                         switch (keyword_val[0]) {
                             case "csv_in":
                             case "browse":
                             case "csv":
-                                filePath = keyword_val[1];
+                                filePath = keyword_val[1].replace("\\\\", "\\").replace("\\","\\\\");
                                 break;
                             case "csv_0":
                             case "csv_out":
                                 if (!keyword_val[1].equals("[]")) {
                                     saveSCV = true;
-                                    csv_target_dir = keyword_val[1];
+                                    csv_target_dir = keyword_val[1].replace("\\\\", "\\").replace("\\","\\\\");
                                 }
                                 break;
                             case "start":
@@ -572,9 +574,16 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
         }
 
         // Require user to either save or show results
-        if (!(visualisation || saveSCV || visualiseZOLA)) {
-            logService.error("No output method of any sorts is selected.\nSelect either Visualisation or Save to SCV.");
+        if(!(visualisation || saveSCV || visualiseZOLA)) {
+            logService.error("No output method of any sorts is selected.\nSelect either Visualisation or Save to CSV.");
             return false;
+        }
+
+        if(!new File(csv_target_dir).exists()) {
+            if(!new File(csv_target_dir).mkdir()) {
+                logService.error("Failed to create CSV target directory: " + csv_target_dir);
+                return false;
+            }
         }
 
         return true;
@@ -759,7 +768,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                 if (distRange[0] > distRange[1]) {
                     logService.error("The distance had to be positive: " + distRange[0] + " is larger than " + distRange[1]);
                 } else if(fileError){
-                    logService.error("Could not load the file. Is the path correct?");
+                    logService.error("Could not load the file. Is the path (" + filePath + ") correct?");
                 } else {
                     logService.error("No features were detected. Are there pairs in this sample?");
                 }
@@ -778,6 +787,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                     logService.info("Total Points: " + floatMatrix.rows);
 
                     final AtomicInteger ai = new AtomicInteger(startFrame); //Atomic Integer is a thread safe incremental integer
+                    final AtomicBoolean reportOrders = new AtomicBoolean(true); //To only report more orders once
                     final Thread[] threads = createThreadArray(coreCount); //Get array of threads
 
                     final FloatMatrix[] intermediateFinals = new FloatMatrix[coreCount]; // All intermediate results to be merged later
@@ -910,7 +920,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                                     }
                                     // Add the points calculated in this frame to this threads buffer
                                     // We also connect the orders here: (1-2, 2-3, 3-4 -> 1-2-3-4)
-                                    intermediateFinals[finalIthread] = FloatMatrix.concatVertically(intermediateFinals[finalIthread], connectOrders(intermediateFinalPossibilities, orders, orderColumns));
+                                    intermediateFinals[finalIthread] = FloatMatrix.concatVertically(intermediateFinals[finalIthread], connectOrders(intermediateFinalPossibilities, orders, orderColumns, reportOrders));
 
                                 } else if (correctAngleAndDistance.length == 1) { // We found only a single point here, so we just add it and do no connecting
                                     int index = correctAngleAndDistance[0];
@@ -1521,7 +1531,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
         // private final float[] angRange = {(float) (-1 * Math.PI), (float) (-0.95 * Math.PI) }; //more than and less than
         // private final float[] distRange = {1940, 2600}; //1800 3000 (1940, 2240)
 
-        debug_arg_string = "csv_in=\"H:\\ThesisData\\output with a space\\combined_drift.csv\" csv_out=\"C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\testing with a space\" visualisation=true";
+        debug_arg_string = "csv_in='H:\\PhD\\spectralSMLM\\Raw Data\\DNAPAINT2D_greenIllum_3colDichroic_fullgreenlaser_TIRF_50ms_gratingFullyToChip_1_MMStack_Pos0.ome.tifWvlt200_LS_gaussMLE5.csv' csv_out='H:\\PhD\\spectralSMLM\\Raw Data\\FullyToChip' visualisation=true";
         //debug_arg_string = "csv_in=F:\\ThesisData\\output\\niels.csv csv_out=C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\testing order_number=2 visualisation=true";
         //debug_arg_string = "csv_in=F:\\ThesisData\\output\\niels.csv visualisation=true angle_start=-0.09 angle_end=0.10 distance_start=2878 distance_end=4386";
         //debug_arg_string = "csv_in=F:\\ThesisData\\output\\output3_drift.csv csv_out=C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\testing angle_start=-2 angle_end=4 distance_start=1332 distance_end=2244 check_distance_delta=true distance_delta=50 visualisation=true";

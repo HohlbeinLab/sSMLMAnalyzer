@@ -41,6 +41,7 @@ import java.io.PrintWriter;
 import java.nio.file.Path;
 import java.util.*;
 
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -246,7 +247,7 @@ public class Util {
         return A.getRows(indices);
     }
 
-    public static FloatMatrix connectOrders(FloatMatrix intermediate, int orders, int orderColumns){
+    public static FloatMatrix connectOrders(FloatMatrix intermediate, int orders, int orderColumns, AtomicBoolean reportOrders){
         // This function takes all points and tried to connect the different points together for at most N orders.
         // If more points are found this is echo'd
         boolean checkMoreOrders = true;
@@ -271,9 +272,10 @@ public class Util {
                     if(checkMoreOrders){
                         connected_to = (int) intermediateExtended.get(row, (orders-1) * orderColumns);
 
-                        if(intermediateExtended.getColumn(2).eq(connected_to).sum() > 1.0f) {
+                        if(reportOrders.get() && intermediateExtended.getColumn(2).eq(connected_to).sum() > 1.0f) {
                             System.out.println("There seem to be more orders than " + orders);
                             checkMoreOrders = false;
+                            reportOrders.set(false);
                         }
                     }
                 }
