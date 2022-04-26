@@ -82,7 +82,11 @@ public class OwnFloatMatrixLoader {
 
             FloatMatrix row = new FloatMatrix(columns);
             for (int c = 0; c < columns; c++) {
-                row.put(c, Float.parseFloat(elements[c]));
+                if(elements[c].equals("Inf")){
+                    row.put(c, Float.parseFloat("Infinity"));
+                } else {
+                    row.put(c, Float.parseFloat(elements[c]));
+                }
             }
             rows.add(row);
         }

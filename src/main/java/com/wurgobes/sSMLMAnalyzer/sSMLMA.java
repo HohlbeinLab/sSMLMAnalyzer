@@ -67,11 +67,11 @@ import org.scijava.plugin.*;
 
 import java.io.*;
 
-import java.lang.reflect.Array;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
@@ -93,7 +93,6 @@ import static com.wurgobes.sSMLMAnalyzer.levenshtein.getTheClosestMatch;
 // TODO
 // refactoring:
 //   No concating in calculations
-// care about z?
 // create a proper final FloatMatrix type, but performance benefit is unknown
 
 // T is only used when calling AngleAnalyzer and denotes the type of image created
@@ -181,10 +180,11 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
 
     //Debug variables (only ever set or used when running from the IDE)
     private boolean processing = true;
-    private static boolean debug = false;
+    private final static boolean debug = false;
     private static String debug_arg_string = "";
     private static boolean runningFromMacro = false;
     private static boolean runningFromIDE = false;
+    private final static boolean debugFlag = false;
 
     private static String GetInputStream(InputStream is) {
         StringBuilder result = new StringBuilder();
@@ -202,6 +202,8 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
         }
         return result.toString();
     }
+
+
 
     // Setup() ensures all variables get filled that need filling
     // and throws errors if it doesn't work out
@@ -414,7 +416,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
             String content = GetInputStream(is);
 
             // Declare and fill the UI with all options
-            GenericDialogPlus gd = new GenericDialogPlus("settings");
+            GenericDialogPlus gd = new GenericDialogPlusPlus("settings");
             String[] colors = ownColorTable.getLuts();
             {
                 gd.addFileField("CSV input", filePath, 25);
@@ -466,7 +468,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
 
                 gd.addCheckbox("Remove Lone Points", toCleanup);
                 gd.addToSameRow();
-                gd.addNumericField("Required Neightbours", neighbours);
+                gd.addNumericField("Required Neighbours", neighbours);
                 gd.addToSameRow();
                 gd.addNumericField("Required Distance", cleanDistance);
                 gd.addMessage("Removes points if there are not at least a number of neighbours in a certain distance.\nWarning: Extremely slow for large datasets");
@@ -519,8 +521,6 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
 
                 angInput[0] = (float) (gd.getNextNumber() * (Math.PI / 180f));
                 angInput[1] = (float) (gd.getNextNumber() * (Math.PI / 180f));
-
-                System.out.print(Arrays.toString(angInput));
 
                 distInput[0] = (float) gd.getNextNumber();
                 distInput[1] = (float) gd.getNextNumber();
@@ -579,7 +579,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
             return false;
         }
 
-        if(!new File(csv_target_dir).exists()) {
+        if(saveSCV && !new File(csv_target_dir).exists()) {
             if(!new File(csv_target_dir).mkdir()) {
                 logService.error("Failed to create CSV target directory: " + csv_target_dir);
                 return false;
@@ -644,6 +644,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                 } catch (Exception e) {
                     logService.info("Error reading file. Does the csv start with a header?");
                     fileError = true;
+                    e.printStackTrace();
                 }
 
 
@@ -745,7 +746,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                     lutRange[1] = distRange[1] == 0f ? distResult[1] : lutRange[1];
 
                     // check if all calculations went right
-                    succes = angleAnalyzer.getSucces();
+                    succes = angleAnalyzer.getSuccess();
                     if (distRange[0] > distRange[1])  succes = false;
 
                 } else {
@@ -1298,9 +1299,8 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
 
                         }
 
-                        boolean specialFlag = false;
-
-                        if(specialFlag) {
+                        // Removed at runtime
+                        if(debugFlag) {
                             float resolutionBinWidth = 250; // 5nm
 
 
@@ -1348,8 +1348,8 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                                     if (currentMedian != Float.MIN_VALUE)
                                         localMedianList.add(currentMedian);
 
-                                    if(false && currentMedianList.size() > 200 && Random.nextDouble() < 0.1 && getAverage(currentMedianList) > 1800) {
-                                        float[] minMax = getFloatMinMax(currentMedianList);
+                                    if(currentMedianList.size() > 200 && Random.nextDouble() < 0.1 && getAverage(currentMedianList) > 1800) {
+                                        // float[] minMax = getFloatMinMax(currentMedianList);
                                         createHist(toFloat(currentMedianList.toArray(new Float[0])), getFBins(currentMedianList, 2), 1900,  2100, x + ", " + y, runningFromIDE);
                                     }
                                 }
@@ -1507,7 +1507,6 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
 
     // Only run from the IDE
     public static void main(String[] args) {
-        debug = false;
         runningFromIDE = true; //this is really dumb
 
         /*
@@ -1531,10 +1530,8 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
         // private final float[] angRange = {(float) (-1 * Math.PI), (float) (-0.95 * Math.PI) }; //more than and less than
         // private final float[] distRange = {1940, 2600}; //1800 3000 (1940, 2240)
 
-        debug_arg_string = "csv_in='H:\\PhD\\spectralSMLM\\Raw Data\\DNAPAINT2D_greenIllum_3colDichroic_fullgreenlaser_TIRF_50ms_gratingFullyToChip_1_MMStack_Pos0.ome.tifWvlt200_LS_gaussMLE5.csv' csv_out='H:\\PhD\\spectralSMLM\\Raw Data\\FullyToChip' visualisation=true";
-        //debug_arg_string = "csv_in=F:\\ThesisData\\output\\niels.csv csv_out=C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\testing order_number=2 visualisation=true";
-        //debug_arg_string = "csv_in=F:\\ThesisData\\output\\niels.csv visualisation=true angle_start=-0.09 angle_end=0.10 distance_start=2878 distance_end=4386";
-        //debug_arg_string = "csv_in=F:\\ThesisData\\output\\output3_drift.csv csv_out=C:\\Users\\Martijn\\Desktop\\Thesis2020\\SpectralData\\testing angle_start=-2 angle_end=4 distance_start=1332 distance_end=2244 check_distance_delta=true distance_delta=50 visualisation=true";
+        debug_arg_string = "angle_start=-0.5 angle_end=4 distance_start=3000 distance_end=3500 csv_in='\\\\WURNET.NL\\Homes\\gobes001\\AppData\\FolderRedirection\\Desktop\\PhD\\Projects\\SpectralSMLM\\Koen Martens Work\\RawData\\Lorenzo_pSMLM_wavelet15.csv' visualisation=true";
+        //debug_arg_string = "angle_start=0 angle_end=4 distance_start=2250 distance_end=3000 csv_in='\\\\WURNET.NL\\Homes\\gobes001\\AppData\\FolderRedirection\\Desktop\\PhD\\Projects\\SpectralSMLM\\Koen Martens Work\\RawData\\SMAP_1B_20200204_combined.csv' visualisation=true";
 
         //debug_arg_string = "";
         net.imagej.ImageJ ij = new ImageJ();

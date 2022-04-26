@@ -10,7 +10,7 @@ This Plugin features a module that tries to determine the angle of the grating, 
 One can get the Plugin by using the download link below, or by subscribing to the Hohlbein lab update site. You can subscribe by going to Help > Update... > Manage Update Sites and checking the Hohlbein lab site. It will automatically be downloaded and updated.
 
 This plugin requires two files: sSMLMA.jar and jblas.jar:  
-The latest version of sSMLA.jar (latest = 0.10.7) can be found [Here](https://github.com/HohlbeinLab/sSMLMAnalyzer)  
+The latest version of sSMLA.jar (latest = 0.10.8) can be found [Here](https://github.com/HohlbeinLab/sSMLMAnalyzer)  
 The latest version of jblas.jar can be found [Here](https://repo1.maven.org/maven2/org/jblas/jblas/1.2.5/jblas-1.2.5.jar)
 
 
@@ -55,11 +55,11 @@ The start and end settings will calculate any value that is unset(=0).
 # Running from a Macro
 
 This plugin can also be run from a macro.
-An example: run("Analyze Pairs", "csv_in=F:\ThesisData\output\combined_drift.csv angle_start=-0.094 angle_end=0.22 distance_start=1500 distance_end=2200 visualisation=true")
+An example: run("Analyze Pairs", "csv_in='F:\ThesisData\output\combined_drift.csv' angle_start=-0.094 angle_end=0.22 distance_start=1500 distance_end=2200 visualisation=true")
 All keywords must be provided in the format: keyword=value, seperated by spaces.
 The keywords available are:
 
-* csv_in - Filepath to the csv input file
+* csv_in - Filepath to the csv input file. Ensure there are no ' in the path
 * csv_out - Directory Path to the folder where the output is written to
 * angle_start - lower angle boundary (rad)
 * angle_end - upper angle boundary (rad)

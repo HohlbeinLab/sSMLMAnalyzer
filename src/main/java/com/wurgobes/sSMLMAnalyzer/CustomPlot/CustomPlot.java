@@ -199,7 +199,7 @@ public class CustomPlot extends Plot implements Cloneable {
 	boolean logXAxis, logYAxis;                     // whether to really use log axis (never for small relative range)
 	//for passing on what should be kept when 'live' plotting (PlotMaker), but note that 'COPY_EXTRA_OBJECTS' is also on for live plotting:
 	int templateFlags = COPY_SIZE | COPY_LABELS | COPY_AXIS_STYLE | COPY_CONTENTS_STYLE | COPY_LEGEND;
-	private int dsize = CustomPlotWindow.getDefaultFontSize();
+	private final int dsize = CustomPlotWindow.getDefaultFontSize();
 	Font defaultFont = FontUtil.getFont("Arial",Font.PLAIN,dsize); //default font for labels, axis, etc.
 	Font currentFont = defaultFont;                 // font as changed by setFont or setFontSize, must never be null
 	private double xScale, yScale;                  // pixels per data unit
@@ -207,10 +207,10 @@ public class CustomPlot extends Plot implements Cloneable {
 	private int maxIntervals = 12;                  // maximum number of intervals between ticks or grid lines
 	private int tickLength = 7;                     // length of major ticks
 	private int minorTickLength = 3;                // length of minor ticks
-	private Color gridColor = new Color(0xc0c0c0);  // light gray
+	private final Color gridColor = new Color(0xc0c0c0);  // light gray
 	private ImageProcessor ip;
 	private ImagePlus imp;                          // if we have an ImagePlus, updateAndDraw on changes
-	private String title;
+	private final String title;
 	private boolean invertedLut;                    // grayscale plots only, set in Edit>Options>Appearance
 	private boolean plotDrawn;
 	PlotMaker plotMaker;                            // for PlotMaker interface, handled by PlotWindow
@@ -219,8 +219,6 @@ public class CustomPlot extends Plot implements Cloneable {
 	float currentLineWidth;
 	private int currentJustification = LEFT;
 	private boolean ignoreForce2Grid;               // after explicit setting of range (limits), ignore 'FORCE2GRID' flags
-	//private boolean snapToMinorGrid;  			// snap to grid when zooming to selection
-	private static double SEPARATED_BAR_WIDTH=0.5;  // for plots with separate bars (e.g. categories), fraction of space, 0.1-1.0
 	double[] steps;                                 // x & y interval between numbers, major ticks & grid lines, remembered for redrawing the grid
 	private int objectToReplace = -1;               // index in allPlotObjects, for replace
 	private Point2D.Double textLoc;                 // remembers position of previous addLabel call (replaces text if at the same position)
@@ -244,7 +242,10 @@ public class CustomPlot extends Plot implements Cloneable {
 	}
 
 	public CustomPlot(String title, String xLabel, String yLabel, float[] xValues, float[] yValues, int flags, LUTService ls, String defaultLUT) {
-		super(title, xLabel, yLabel, xValues, yValues, flags);
+		//super(title, xLabel, yLabel, xValues, yValues, flags);
+		super(title, xLabel, yLabel, flags);
+		if(xValues != null && yValues != null)
+			add("dot", xValues, yValues);
 		this.title = title;
 		pp.xLabel.label = xLabel;
 		pp.yLabel.label = yLabel;
@@ -295,6 +296,7 @@ public class CustomPlot extends Plot implements Cloneable {
 
 
 	private void drawLUTLegend(PlotObject lut){
+		makeMarginValues();
 		int positionCode = lut.flags & LEGEND_POSITION_MASK;
 		if(positionCode == 0) return;
 
@@ -363,6 +365,7 @@ public class CustomPlot extends Plot implements Cloneable {
 	}
 
 	private void drawString(String text, double x, double y){
+		makeMarginValues();
 		ip.drawString(text,
 				leftMargin + (int)(x*frameWidth),
 				topMargin + (int)(y*frameHeight));
@@ -370,6 +373,7 @@ public class CustomPlot extends Plot implements Cloneable {
 
 	private	void drawNormalisedLineIP(double x1, double y1, double x2, double y2){
 		ip.setClipRect(frame);
+		makeMarginValues();
 		int ix1 = leftMargin + (int)(x1*frameWidth);
 		int iy1 = topMargin	 + (int)(y1*frameHeight);
 		int ix2 = leftMargin + (int)(x2*frameWidth);
@@ -609,6 +613,7 @@ public class CustomPlot extends Plot implements Cloneable {
 
 	/** The minimum plot size including borders, in pixels (at scale=1) */
 	public Dimension getMinimumSize() {
+		makeMarginValues();
 		return new Dimension(MIN_FRAMEWIDTH + leftMargin + rightMargin,
 				MIN_FRAMEHEIGHT + topMargin + bottomMargin);
 	}
@@ -820,6 +825,11 @@ public class CustomPlot extends Plot implements Cloneable {
 	public void add(String type, double[] xvalues, double[] yvalues) {
 		int iShape = toShape(type);
 		addPoints(Tools.toFloat(xvalues), Tools.toFloat(yvalues), null, iShape, iShape==CUSTOM?type.substring(5):null);
+	}
+
+	public void add(String type, float[] xvalues, float[] yvalues) {
+		int iShape = toShape(type);
+		addPoints(xvalues, yvalues, null, iShape, iShape==CUSTOM?type.substring(5):null);
 	}
 
 	public void add(String type, double[] xvalues, double[] yvalues, double[] zvalues) {
@@ -1525,7 +1535,6 @@ public class CustomPlot extends Plot implements Cloneable {
 		int nItems = items.length;
 		if (items[nItems - 1].contains("hidden")) {
 			plotObject.setFlag(PlotObject.HIDDEN);
-			nItems = items.length - 1;
 		} else
 			plotObject.unsetFlag(PlotObject.HIDDEN);
 		plotObject.color = Colors.decode(items[0].trim(), plotObject.color);
@@ -2576,7 +2585,7 @@ public class CustomPlot extends Plot implements Cloneable {
 	void drawAxesTicksGridNumbers(double[] steps) {
 		if (ip==null)
 			return;
-
+		makeMarginValues();
 		String[] xCats = labelsInBraces('x');   // create categories for the axes (if any)
 		String[] yCats = labelsInBraces('y');
 		String multiplySymbol = getMultiplySymbol(); // for scientific notation
@@ -3340,6 +3349,9 @@ public class CustomPlot extends Plot implements Cloneable {
 		String[] xCats = labelsInBraces('x'); // do we have categories at the x axis instead of numbers?
 		boolean separatedBars = plotObject.shape == SEPARATED_BAR || xCats != null;
 		int halfBarWidthInPixels = n <= 1 ? Math.max(1, frameWidth/2-2) : 0;
+		//private boolean snapToMinorGrid;  			// snap to grid when zooming to selection
+		// for plots with separate bars (e.g. categories), fraction of space, 0.1-1.0
+		double SEPARATED_BAR_WIDTH = 0.5;
 		if (separatedBars && n > 1)
 			halfBarWidthInPixels = Math.max(1, (int)Math.round(Math.abs
 				(0.5*(plotObject.xValues[n-1] - plotObject.xValues[0])/(n-1) * xScale * SEPARATED_BAR_WIDTH)));

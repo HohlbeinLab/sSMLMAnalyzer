@@ -55,7 +55,6 @@ import org.jblas.FloatMatrix;
 import org.scijava.command.Command;
 import org.scijava.log.LogService;
 
-import java.awt.*;
 import java.util.ArrayList;
 
 import static com.wurgobes.sSMLMAnalyzer.Util.*;
@@ -69,7 +68,7 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
 
     private final FloatMatrix data; // All localisations
 
-    // Results of angles and ditances
+    // Results of angles and distances
     private double angle_low;
     private double angle_high;
 
@@ -84,7 +83,7 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
 
     // Indicates if features were found
     // When there are no regular features (like distances) this will be false
-    private boolean succes = false;
+    private boolean success = false;
 
     public AngleAnalyzer(FloatMatrix data, boolean flipAngles, boolean mirrorAngles, LogService logService, boolean debug){
         this.data = data;
@@ -330,7 +329,7 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
         // the low end is given by the first peak
         // the high end by the last peak
         if(distances.size() > 0){
-            succes = true;
+            success = true;
             double buffer = 0.0075 * averageSize;
 
             dist_low = distances.get(0) * 0.90 - buffer/2;
@@ -354,6 +353,6 @@ public class AngleAnalyzer < T extends IntegerType<T>> implements Command {
         return new float[]{Math.round(dist_low), Math.round(dist_high)};
     }
 
-    public boolean getSucces() {return succes;}
+    public boolean getSuccess() {return success;}
 
 }
