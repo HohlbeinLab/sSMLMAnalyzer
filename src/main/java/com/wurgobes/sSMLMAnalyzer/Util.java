@@ -35,9 +35,7 @@ import org.jblas.FloatMatrix;
 import org.jblas.ranges.IntervalRange;
 
 
-import java.io.File;
-import java.io.IOException;
-import java.io.PrintWriter;
+import java.io.*;
 import java.nio.file.Path;
 import java.util.*;
 
@@ -156,16 +154,33 @@ public class Util {
         return result;
     }
 
-    public static void SaveCSV(final FloatMatrix data, List<String> Headers, Path CSV_FILE_NAME)  {
-        // Creates a csv file and writes all the data to it
-        File csvOutputFile = CSV_FILE_NAME.toFile();
-        try (PrintWriter pw = new PrintWriter(csvOutputFile)) {
-            pw.println(String.join(",", Headers));
-            pw.println(data.toString("%f", "", "",", ", "\n"));
-        } catch(IOException error) {
+    public static void SaveCSV(final FloatMatrix data, List<String> Headers, Path CSV_FILE_NAME) {
+        try {
+            FileWriter fileWrt = new FileWriter(CSV_FILE_NAME.toString());
+            BufferedWriter bufferWrt = new BufferedWriter(fileWrt);
+            bufferWrt.write(String.join(",", Headers));
+
+            StringBuilder s = new StringBuilder(100);
+            for (int r = 0; r < data.rows; r++) {
+                s.setLength(0);
+                for (int c = 0; c < data.columns; c++) {
+                    s.append(data.get(r, c));
+                    if (c < data.columns - 1) {
+                        s.append(",");
+                    }
+                }
+                if (r < data.rows - 1) {
+                    s.append("\n");
+                    bufferWrt.write(s.toString());
+                }
+            }
+
+            bufferWrt.close();
+        } catch (Exception e) {
             System.out.println("Could not save CSV.");
-            error.printStackTrace();
+            e.printStackTrace();
         }
+        System.gc();
     }
 
     public static int getBins(FloatMatrix A, float width){
@@ -636,4 +651,10 @@ public class Util {
                 .mapToDouble(a -> a)
                 .average().orElse(0.0);
     }
+
+    public static int[] getFrameNumbers(FloatMatrix data, int frameCollumn) {
+        int[] key = data.getColumn(frameCollumn).toIntArray();
+        return Arrays.stream(key).distinct().toArray();
+    }
+
 }

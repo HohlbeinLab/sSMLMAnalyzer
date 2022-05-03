@@ -780,14 +780,15 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                 FloatMatrix allOrdersCombined;
                 if (processing) {
 
-                    final int frames = (int) data.getColumn(0).max(); //Get end frame number
-                    final int startFrame = (int) data.getColumn(0).min(); //Get start frame number
+                    final FloatMatrix frameCollumn = data.getColumn(0);
+                    final int[] frames = getFrameNumbers(data, 0);
+                    final int numFrames = frames.length;
 
                     // Echo back amount of frames and points
-                    logService.info("Total Frames: " + (frames - startFrame));
+                    logService.info("Total Frames: " + numFrames);
                     logService.info("Total Points: " + floatMatrix.rows);
 
-                    final AtomicInteger ai = new AtomicInteger(startFrame); //Atomic Integer is a thread safe incremental integer
+                    final AtomicInteger ai = new AtomicInteger(0); //Atomic Integer is a thread safe incremental integer
                     final AtomicBoolean reportOrders = new AtomicBoolean(true); //To only report more orders once
                     final Thread[] threads = createThreadArray(coreCount); //Get array of threads
 
@@ -808,17 +809,16 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                             intermediateFinals[finalIthread] = new FloatMatrix(0, totalColumns);
 
                             // Process each frame
-                            for (int frame = ai.getAndIncrement(); frame <= frames; frame = ai.getAndIncrement()) {
-
+                            for (int frameIndex = ai.getAndIncrement(); frameIndex < numFrames; frameIndex = ai.getAndIncrement()) {
+                                final int frame = frames[frameIndex];
                                 // Showing process to the user
-                                if (runningFromIDE && frame % 1000 == 0) logService.info("\r" + frame + "/" + frames);
-                                IJ.showProgress(frame, frames);
-                                IJ.showStatus(frame + "/" + frames);
+                                if (runningFromIDE && frame % 1000 == 0) logService.info("\r" + frame + "/" + numFrames);
+                                IJ.showProgress(frame, numFrames);
+                                IJ.showStatus(frame + "/" + numFrames);
 
-
-                                final int[] frameIndicices = data.getColumn(0).eq(frame).findIndices(); // All rows indices for current frame
-
+                                final int[] frameIndicices = frameCollumn.eq(frame).findIndices(); // All rows indices for current frame
                                 final FloatMatrix frameData = data.getRows(frameIndicices); //All rows for current frame
+
 
                                 // Distance Matrices that show distance from one point to each other point in X and Y
                                 final FloatMatrix subtractedX = makeSubstractedMatrix(frameData.getColumn(1));
@@ -960,7 +960,6 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                     // Echo back time it took
                     processingTime = System.nanoTime() - processingTime;
                     logService.info("Processing data took " + String.format("%.3f", processingTime / 1000000000) + " s");
-
 
                     // Ensure nothing went wrong and echo back how many points we found
                     // Also clean up some garbage since we are done processing and there are many things we no longer need
@@ -1120,6 +1119,11 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                                     finalPossibilities = backup; // In case the matrix got corrupted above
 
                                 }
+                            }
+                            if(finalPossibilities.rows == 0) {
+                                logService.info("Filtering resulted in no points. Restoring old data");
+                                IJ.showMessage("Filtering resulted in no points. Restoring old data");
+                                finalPossibilities = backup;
                             }
                         }
 
@@ -1380,6 +1384,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                         if (saveSCV) {
                             // Remove unneeded Z column before saving
                             //System.out.println(finalPossibilities.getRow(0));
+                            logService.info("Writing files to " + csv_target_dir);
                             FloatMatrix noZMatrix = null;
                             if(!hasZ){
                                 noZMatrix = new FloatMatrix(finalPossibilities.rows, orders * (orderColumns - 1));
@@ -1442,6 +1447,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                             ShortHeader.add("angle");
 
                             try {
+                                logService.info(("Writing all_orders.csv"));
                                 // Save all data using the proper header, including one that easily is loaded into ThunderSTORM again for visualisation etc
                                 if (hasZ)
                                     SaveCSV(finalPossibilities, LongHeader, Paths.get(csv_target_dir, "all_orders.csv"));
@@ -1452,22 +1458,25 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                             }
 
                             try {
+                                logService.info(("Writing two_orders_combined_positions.csv"));
                                 SaveCSV(halfOrderMatrix, ShortHeader, Paths.get(csv_target_dir, "two_orders_combined_positions.csv"));
                             } catch(Exception e){
                                 logService.error("Could not create file: two_orders_combined_positions.csv. Is the file opened anywhere?");
                             }
                             try {
+                                logService.info(("Writing all_orders_combined_positions.csv"));
                                 SaveCSV(allOrdersCombined, ShortHeader, Paths.get(csv_target_dir, "all_orders_combined_positions.csv"));
                             } catch(Exception e){
                                 logService.error("Could not create file: all_orders_combined_positions.csv. Is the file opened anywhere?");
                             }
                             try {
+                                logService.info(("Writing thunderSTORM.csv"));
                                 saveThunderSTORM(Paths.get(csv_target_dir, "thunderSTORM.csv"), finalPossibilities.getColumns(new int[]{0, 1, 3, 4, 6, 12}));
                             } catch(Exception e){
                                 logService.error("Could not create file: thunderSTORM.csv. Is the file opened anywhere?");
                             }
-
-                            }
+                            logService.info(("Finished writing all csv files."));
+                        }
 
                         if(visualiseZOLA) {
                             logService.info("ZOLA Visualisation");
@@ -1530,9 +1539,12 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
         // private final float[] angRange = {(float) (-1 * Math.PI), (float) (-0.95 * Math.PI) }; //more than and less than
         // private final float[] distRange = {1940, 2600}; //1800 3000 (1940, 2240)
 
-        debug_arg_string = "angle_start=-0.5 angle_end=4 distance_start=3000 distance_end=3500 csv_in='\\\\WURNET.NL\\Homes\\gobes001\\AppData\\FolderRedirection\\Desktop\\PhD\\Projects\\SpectralSMLM\\Koen Martens Work\\RawData\\Lorenzo_pSMLM_wavelet15.csv' visualisation=true";
+        //debug_arg_string = "angle_start=-0.5 angle_end=4 distance_start=3000 distance_end=3500 csv_in='\\\\WURNET.NL\\Homes\\gobes001\\AppData\\FolderRedirection\\Desktop\\PhD\\Projects\\SpectralSMLM\\Koen Martens Work\\RawData\\Lorenzo_pSMLM_wavelet15.csv' visualisation=true";
         //debug_arg_string = "angle_start=0 angle_end=4 distance_start=2250 distance_end=3000 csv_in='\\\\WURNET.NL\\Homes\\gobes001\\AppData\\FolderRedirection\\Desktop\\PhD\\Projects\\SpectralSMLM\\Koen Martens Work\\RawData\\SMAP_1B_20200204_combined.csv' visualisation=true";
+        //debug_arg_string = "csv_in='C:\\\\Users\\\\gobes001\\\\PhD\\\\Projects\\\\SpectralSMLM\\\\Koen Martens Work\\\\RawData\\\\20200120 part Fig3\\\\Movie1_pSMLM3_wavelet15.csv' csv_out='C:\\\\Users\\\\gobes001\\\\PhD\\\\Projects\\\\SpectralSMLM\\\\Koen Martens Work\\\\RawData\\\\20200120 part Fig3\\\\Movie1_15_2' angle_start=-0.7 angle_end=4 distance_start=2500 distance_end=3500 visualisation=true lone_pair_remove=true lone_pair_neighbours=250 lone_pair_distance=400";
+        debug_arg_string = "distance_start=3000 distance_end=3500 angle_start=0.01 angle_end=4 csv_out='C:\\Users\\gobes001\\PhD\\Projects\\SpectralSMLM\\Koen Martens Work\\RawData\\sSMLM_20200520 Fig 2\\loc1_pos0' csv_in='C:\\Users\\gobes001\\PhD\\Projects\\SpectralSMLM\\Koen Martens Work\\RawData\\sSMLM_20200520 Fig 2\\Analysis_loc1\\3colDich_fullRed_20ms_grating_HiLoish_lowUV_sameloc_1_MMStack_Pos0_1.ome.tif_50MEDfilter_Wavelet20_pSMLM3.csv' visualisation=true";
 
+        // v1: 35.759 v_all: 70.142
         //debug_arg_string = "";
         net.imagej.ImageJ ij = new ImageJ();
         ij.ui().showUI();
