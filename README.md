@@ -12,7 +12,7 @@ Please cite our work when using this software: Martens et al., "Enabling spectra
 One can get the Plugin by using the download link below, or by subscribing to the Hohlbein lab update site. You can subscribe by going to Help > Update... > Manage Update Sites and checking the Hohlbein lab site. It will automatically be downloaded and updated.
 
 This plugin requires two files: sSMLMA.jar and jblas.jar:  
-The latest version of sSMLA.jar (latest = 0.11.1) can be found [Here](https://github.com/HohlbeinLab/sSMLMAnalyzer/target)  
+The latest version of sSMLA.jar (latest = 0.11.1) can be found [Here](https://github.com/HohlbeinLab/sSMLMAnalyzer/tree/master/target)  
 The latest version of jblas.jar can be found [Here](https://repo1.maven.org/maven2/org/jblas/jblas/1.2.5/jblas-1.2.5.jar)
 
 
