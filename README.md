@@ -6,14 +6,14 @@ It does this based on the assumption that a grating was fixed in front of the ca
 
 An ImageJ (JAVA-based) plugin is available, which is recommended for general use. MATLAB scripts as provided as well, with mainly identical functionality.
 
-Please cite our work when using this software: Martens et al., "Enabling spectrally resolved single-molecule localization microscopy at high emitter densities" (2022) (DOI available soon)
+Please cite our work when using this software: Martens et al., "Enabling spectrally resolved single-molecule localization microscopy at high emitter densities" (2022) ([10.1101/2022.06.29.498127](https://doi.org/10.1101/2022.06.29.498127 ))
 
 # Installation
 One can get the Plugin by using the download link below, or by subscribing to the Hohlbein lab update site. You can subscribe by going to Help > Update... > Manage Update Sites and checking the Hohlbein lab site. It will automatically be downloaded and updated.
 
 This plugin requires one files: sSMLMA.jar:  
 The latest version of sSMLA.jar (latest = 1.0) can be found [Here](https://github.com/HohlbeinLab/sSMLMAnalyzer/tree/master/target)  
-The latest version of jblas.jar is packaged into the jar, but can also be found [Here](https://repo1.maven.org/maven2/org/jblas/jblas/1.2.5/jblas-1.2.5.jar)
+The 1.2.5 version of jblas is packaged into the jar, but can also be found [Here](https://repo1.maven.org/maven2/org/jblas/jblas/1.2.5/jblas-1.2.5.jar)
 
 
 Once downloaded it can be installed by launching ImageJ > Plugins > Install... Selecting the downloaded jar and restarting ImageJ (for each jar file).  
