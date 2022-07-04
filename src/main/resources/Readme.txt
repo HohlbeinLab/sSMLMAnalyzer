@@ -5,6 +5,7 @@ A Plugin for ImageJ that takes localisations (usually from Super Resolution Micr
 It does this based on the assumption that a grating was fixed in front of the camera sensor and thus each feature produced multiple localisations, with a distance based on the wavelength of the original signal.<br>
 <br>
 This Plugin features a module that tries to determine the angle of the grating, as well as the wavelength range used to detect pairs. These values can also be determined manually by following the instructions in AngleDistance.md.<br>
+This might not work if too few frames are provided; try to provide at least a few thousand.
 <br>
 # Usage<br>
 <br>
