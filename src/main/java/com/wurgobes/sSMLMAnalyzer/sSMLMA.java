@@ -68,6 +68,7 @@ import org.scijava.plugin.*;
 import java.io.*;
 
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -87,6 +88,11 @@ import org.jblas.exceptions.LapackException;
 import static com.wurgobes.sSMLMAnalyzer.Util.*;
 import static com.wurgobes.sSMLMAnalyzer.levenshtein.getTheClosestMatch;
 
+import javax.xml.parsers.*;
+import javax.xml.transform.*;
+import javax.xml.transform.dom.*;
+import javax.xml.transform.stream.*;
+import org.w3c.dom.*;
 
 @Plugin(type = Command.class, menuPath = "Plugins>Spectral Analyzer>Analyze Pairs")
 
@@ -203,7 +209,207 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
         return result.toString();
     }
 
+    private void WriteXML(Path FilePath) {
+        Document dom;
+        Element e1;
+        Element e2;
+        Element e3;
 
+        // instance of a DocumentBuilderFactory
+        DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+        try {
+            // use factory to get an instance of document builder
+            DocumentBuilder db = dbf.newDocumentBuilder();
+            // create instance of DOM
+            dom = db.newDocument();
+
+            // create the root element
+            Element rootEle = dom.createElement("Spectral_SMLM_Analzyer");
+
+            e1 = dom.createElement("info");
+
+            e2 = dom.createElement("version");
+            e2.appendChild(dom.createTextNode("1.0")); //should make this dynamic
+            e1.appendChild(e2);
+
+            e2 = dom.createElement("time");
+            e2.appendChild(dom.createTextNode(String.valueOf(java.time.LocalDate.now()))); //yyyy-MM-dd
+            e1.appendChild(e2);
+
+            rootEle.appendChild(e1);
+
+            e1 = dom.createElement("settings");
+
+            e2 = dom.createElement("csv_in");
+            e2.appendChild(dom.createTextNode(filePath));
+            e1.appendChild(e2);
+
+            if(saveSCV) {
+                e2 = dom.createElement("csv_out");
+                e2.appendChild(dom.createTextNode(csv_target_dir));
+                e1.appendChild(e2);
+            }
+
+            e2 = dom.createElement("angles_input");
+
+                e3 = dom.createElement("start");
+                e3.appendChild(dom.createTextNode(String.valueOf(angInput[0])));
+            e2.appendChild(e3);
+
+                e3 = dom.createElement("end");
+                e3.appendChild(dom.createTextNode(String.valueOf(angInput[1])));
+            e2.appendChild(e3);
+
+            e1.appendChild(e2);
+
+            e2 = dom.createElement("distances_input");
+
+                e3 = dom.createElement("start");
+                e3.appendChild(dom.createTextNode(String.valueOf(distInput[0])));
+            e2.appendChild(e3);
+
+                e3 = dom.createElement("end");
+                e3.appendChild(dom.createTextNode(String.valueOf(distInput[1])));
+            e2.appendChild(e3);
+
+            e1.appendChild(e2);
+
+            e2 = dom.createElement("orders");
+            e2.appendChild(dom.createTextNode(String.valueOf(orders)));
+            e1.appendChild(e2);
+
+            if(checkForIntensity) {
+                e2 = dom.createElement("ratio_intensity");
+                e2.appendChild(dom.createTextNode(String.valueOf(ratioIntensity)));
+                e1.appendChild(e2);
+            }
+
+            e2 = dom.createElement("angle_flip");
+            e2.appendChild(dom.createTextNode(String.valueOf(flipAngles)));
+            e1.appendChild(e2);
+
+            e2 = dom.createElement("angle_mirror");
+            e2.appendChild(dom.createTextNode(String.valueOf(mirrorAngles)));
+            e1.appendChild(e2);
+
+            e2 = dom.createElement("angle_search");
+            e2.appendChild(dom.createTextNode(String.valueOf(searchAngle)));
+            e1.appendChild(e2);
+
+            e2 = dom.createElement("angle_deep_search");
+            e2.appendChild(dom.createTextNode(String.valueOf(deepSearchAngle)));
+            e1.appendChild(e2);
+
+            if(toCleanup) {
+                e2 = dom.createElement("lone_pair_neighbours");
+                e2.appendChild(dom.createTextNode(String.valueOf(neighbours)));
+                e1.appendChild(e2);
+
+                e2 = dom.createElement("lone_pair_distance");
+                e2.appendChild(dom.createTextNode(String.valueOf(cleanDistance)));
+                e1.appendChild(e2);
+            }
+
+            if(visualisation) {
+                e2 = dom.createElement("ZOLA");
+                e2.appendChild(dom.createTextNode(String.valueOf(visualiseZOLA)));
+                e1.appendChild(e2);
+
+                e2 = dom.createElement("histogram_binwidth");
+                e2.appendChild(dom.createTextNode(String.valueOf(binwidth)));
+                e1.appendChild(e2);
+
+                e2 = dom.createElement("LUT");
+                e2.appendChild(dom.createTextNode(defaultLUT));
+                e1.appendChild(e2);
+
+                e2 = dom.createElement("LUT_range");
+
+                    e3 = dom.createElement("start");
+                    e3.appendChild(dom.createTextNode(String.valueOf(lutRange[0])));
+                e2.appendChild(e3);
+
+                    e3 = dom.createElement("end");
+                    e3.appendChild(dom.createTextNode(String.valueOf(lutRange[1])));
+                e2.appendChild(e3);
+
+                e1.appendChild(e2);
+            }
+
+            if(checkforZ) {
+                e2 = dom.createElement("check_z_margin");
+                e2.appendChild(dom.createTextNode(String.valueOf(zMargin)));
+                e1.appendChild(e2);
+            }
+
+            if(checkDistanceOrderDelta) {
+                e2 = dom.createElement("distance_delta");
+                e2.appendChild(dom.createTextNode(String.valueOf(zMargin)));
+                e1.appendChild(e2);
+            }
+
+            rootEle.appendChild(e1);
+
+            e1 = dom.createElement("calculated");
+
+            e2 = dom.createElement("angles_calculated");
+
+                e3 = dom.createElement("start");
+                e3.appendChild(dom.createTextNode(String.valueOf(angRange[0])));
+            e2.appendChild(e3);
+
+                e3 = dom.createElement("end");
+                e3.appendChild(dom.createTextNode(String.valueOf(angRange[1])));
+            e2.appendChild(e3);
+
+            e1.appendChild(e2);
+
+            e2 = dom.createElement("distance_calculated");
+
+                e3 = dom.createElement("start");
+                e3.appendChild(dom.createTextNode(String.valueOf(distRange[0])));
+            e2.appendChild(e3);
+
+                e3 = dom.createElement("end");
+                e3.appendChild(dom.createTextNode(String.valueOf(distRange[1])));
+            e2.appendChild(e3);
+
+            e1.appendChild(e2);
+
+            e2 = dom.createElement("LUT_calculated");
+
+            e3 = dom.createElement("start");
+            e3.appendChild(dom.createTextNode(String.valueOf(lutRange[0])));
+            e2.appendChild(e3);
+
+            e3 = dom.createElement("end");
+            e3.appendChild(dom.createTextNode(String.valueOf(lutRange[1])));
+            e2.appendChild(e3);
+
+            e1.appendChild(e2);
+
+            rootEle.appendChild(e1);
+
+
+            dom.appendChild(rootEle);
+
+            try {
+                Transformer tr = TransformerFactory.newInstance().newTransformer();
+                tr.setOutputProperty(OutputKeys.INDENT, "yes");
+                tr.setOutputProperty(OutputKeys.METHOD, "xml");
+                tr.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
+                tr.setOutputProperty(OutputKeys.DOCTYPE_SYSTEM, "settings.dtd");
+                tr.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "4");
+                // send DOM to file
+                tr.transform(new DOMSource(dom),
+                        new StreamResult(Files.newOutputStream(FilePath)));
+            } catch (TransformerException | IOException te) {
+                logService.info(te.getMessage());
+            }
+        } catch (ParserConfigurationException pce) {
+            logService.info("UsersXML: Error trying to instantiate DocumentBuilder " + pce);
+        }
+    }
 
     // Setup() ensures all variables get filled that need filling
     // and throws errors if it doesn't work out
@@ -242,7 +448,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                     "lone_pair_remove", "lone_pair_neighbours", "lone_pair_distance",
                     "visualisation", "visualisationZOLA", "hist_binwidth", "LUT", "LUT_start", "LUT_end",
                     "check_z", "check_z_margin", "check_distance_delta", "distance_delta",
-                    //These are for macro recording mode.. don't think about it
+                    //These are for macro recording mode. Don't think about it
                     "browse", "csv", "save", "csv_0", "start", "end", "start_0", "end_0",
                     "number", "restrict", "max", "intensity", "ratio", "flip", "mirror",
                     "search", "search_0", "remove", "required_0", "remove_0", "maximum", "visualise",
@@ -1382,6 +1588,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                         }
 
                         if (saveSCV) {
+
                             // Remove unneeded Z column before saving
                             //System.out.println(finalPossibilities.getRow(0));
                             logService.info("Writing files to " + csv_target_dir);
@@ -1507,6 +1714,10 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
                                 e.printStackTrace();
                             }
                         }
+
+                        WriteXML(Paths.get(csv_target_dir, "info.xml"));
+                        logService.info("Finished writing XML file");
+
                     }
                 }
             }
@@ -1542,7 +1753,7 @@ public class sSMLMA <T extends IntegerType<T>> implements Command {
         //debug_arg_string = "angle_start=-0.5 angle_end=4 distance_start=3000 distance_end=3500 csv_in='\\\\WURNET.NL\\Homes\\gobes001\\AppData\\FolderRedirection\\Desktop\\PhD\\Projects\\SpectralSMLM\\Koen Martens Work\\RawData\\Lorenzo_pSMLM_wavelet15.csv' visualisation=true";
         //debug_arg_string = "angle_start=0 angle_end=4 distance_start=2250 distance_end=3000 csv_in='\\\\WURNET.NL\\Homes\\gobes001\\AppData\\FolderRedirection\\Desktop\\PhD\\Projects\\SpectralSMLM\\Koen Martens Work\\RawData\\SMAP_1B_20200204_combined.csv' visualisation=true";
         //debug_arg_string = "csv_in='C:\\\\Users\\\\gobes001\\\\PhD\\\\Projects\\\\SpectralSMLM\\\\Koen Martens Work\\\\RawData\\\\20200120 part Fig3\\\\Movie1_pSMLM3_wavelet15.csv' csv_out='C:\\\\Users\\\\gobes001\\\\PhD\\\\Projects\\\\SpectralSMLM\\\\Koen Martens Work\\\\RawData\\\\20200120 part Fig3\\\\Movie1_15_2' angle_start=-0.7 angle_end=4 distance_start=2500 distance_end=3500 visualisation=true lone_pair_remove=true lone_pair_neighbours=250 lone_pair_distance=400";
-        debug_arg_string = "distance_start=3000 distance_end=3500 angle_start=0.01 angle_end=4 csv_out='C:\\Users\\gobes001\\PhD\\Projects\\SpectralSMLM\\Koen Martens Work\\RawData\\sSMLM_20200520 Fig 2\\loc1_pos0' csv_in='C:\\Users\\gobes001\\PhD\\Projects\\SpectralSMLM\\Koen Martens Work\\RawData\\sSMLM_20200520 Fig 2\\Analysis_loc1\\3colDich_fullRed_20ms_grating_HiLoish_lowUV_sameloc_1_MMStack_Pos0_1.ome.tif_50MEDfilter_Wavelet20_pSMLM3.csv' visualisation=true";
+        debug_arg_string = "distance_start=1520 distance_end=2200 angle_start=-0.65 angle_end=0.5 csv_out='I:\\ThesisData\\input\\testouput\\' csv_in='I:\\ThesisData\\input\\localisations_driftcorr_first1000.csv' visualisation=true";
 
         // v1: 35.759 v_all: 70.142
         //debug_arg_string = "";
@@ -1566,3 +1777,4 @@ class Point3D {
     public float getY() { return y;}
     public float getZ() { return z;}
 }
+

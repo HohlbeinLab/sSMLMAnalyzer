@@ -11,9 +11,9 @@ Please cite our work when using this software: Martens et al., "Enabling spectra
 # Installation
 One can get the Plugin by using the download link below, or by subscribing to the Hohlbein lab update site. You can subscribe by going to Help > Update... > Manage Update Sites and checking the Hohlbein lab site. It will automatically be downloaded and updated.
 
-This plugin requires two files: sSMLMA.jar and jblas.jar:  
-The latest version of sSMLA.jar (latest = 0.11.1) can be found [Here](https://github.com/HohlbeinLab/sSMLMAnalyzer/tree/master/target)  
-The latest version of jblas.jar can be found [Here](https://repo1.maven.org/maven2/org/jblas/jblas/1.2.5/jblas-1.2.5.jar)
+This plugin requires one files: sSMLMA.jar:  
+The latest version of sSMLA.jar (latest = 1.0) can be found [Here](https://github.com/HohlbeinLab/sSMLMAnalyzer/tree/master/target)  
+The latest version of jblas.jar is packaged into the jar, but can also be found [Here](https://repo1.maven.org/maven2/org/jblas/jblas/1.2.5/jblas-1.2.5.jar)
 
 
 Once downloaded it can be installed by launching ImageJ > Plugins > Install... Selecting the downloaded jar and restarting ImageJ (for each jar file).  
@@ -26,6 +26,9 @@ This csv file should have a header and can have either a tab, semicolon or comma
 The required columns are: frame, x, y, intensity. 
 
 The ImageJ plugin features a module that tries to determine the angle of the grating, as well as the wavelength range used to detect pairs. These values can also be determined manually by following the instructions in AngleDistance.md.
+This feature might not work properly when a low number of frames is provided. 
+
+All settings input and calculated are written an XML file when saving is enabled.
 
 The settings and their effects are as follows:  
 The start and end settings will calculate any value that is unset(=0).

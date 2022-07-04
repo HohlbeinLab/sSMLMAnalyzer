@@ -14,7 +14,7 @@
 
 	<groupId>com.wurgobes</groupId>
 	<artifactId>sSMLMA</artifactId>
-	<version>0.9-SNAPSHOT</version>
+	<version>1.0</version>
 
 
 	<name>sSMLM Analyzer</name>
@@ -87,7 +87,7 @@
 		<main-class>com.wurgobes.sSMLMAnalyzer.sSMLMA</main-class>
 		<license.licenseName>bsd_2</license.licenseName>
 		<license.copyrightOwners>WUR, Inc.</license.copyrightOwners>
-		<scijava.app.directory>C:\Users\gobes001\LocalSoftware\fiji-win64\Fiji.app</scijava.app.directory>
+		<scijava.app.directory>H:\PhD\fiji-win64\Fiji.app</scijava.app.directory>
 	</properties>
 
 	<repositories>
@@ -119,6 +119,18 @@
 			<groupId>sc.fiji</groupId>
 			<artifactId>Directionality_</artifactId>
 		</dependency>
+		<dependency>
+			<groupId>org.apache.maven.plugins</groupId>
+			<artifactId>maven-shade-plugin</artifactId>
+			<version>3.3.0</version>
+			<exclusions>
+				<exclusion>
+					<groupId>org.eclipse.aether</groupId>
+					<artifactId>aether-util</artifactId>
+				</exclusion>
+			</exclusions>
+			<scope>compile</scope>
+		</dependency>
         <!--Might be needed
         <dependency>
             <groupId>org.ujmp</groupId>
@@ -132,5 +144,29 @@
         </dependency>
         -->
 	</dependencies>
-	
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-shade-plugin</artifactId>
+				<version>3.3.0</version>
+				<executions>
+					<execution>
+						<phase>package</phase>
+						<goals>
+							<goal>shade</goal>
+						</goals>
+						<configuration>
+							<artifactSet>
+								<includes>
+									<include>org.jblas:jblas</include>
+								</includes>
+							</artifactSet>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
 </project>
